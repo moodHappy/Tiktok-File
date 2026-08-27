@@ -640,43 +640,68 @@ def generate_index_template():
             } catch(e) {}
         }
 
-        // ================= 智能多通道短链还原引擎 =================
-        async function resolveTikTokVideoId(rawInput) {
+        // ================= 终极 TikTok 短链/长链多通道解析引擎 =================
+        async function resolveTikTokVideoData(rawInput) {
             let text = rawInput.trim();
             
-            // 1. 如果是纯数字 ID (例如 7311302323228167429)
-            if (/^\d{15,22}$/.test(text)) return text;
+            // 1. 如果输入为纯数字 Video ID
+            if (/^\d{15,22}$/.test(text)) return { id: text };
             
-            // 2. 如果是标准长链 (例如 /video/731130232...)
+            // 2. 如果是标准完整长链 (/video/731130232...)
             let match = text.match(/\/video\/(\d{15,22})/);
-            if (match) return match[1];
+            if (match) return { id: match[1] };
 
-            // 3. 如果是数字嵌入
+            // 3. 如果包含独立的 18~21 位数字
             let matchAlt = text.match(/\b\d{18,21}\b/);
-            if (matchAlt) return matchAlt[0];
+            if (matchAlt) return { id: matchAlt[0] };
 
-            // 4. 如果是短链 (vt.tiktok.com 或 vm.tiktok.com)，启动跨域代理追查真实目标
+            // 4. 如果是 vt.tiktok.com 或 vm.tiktok.com 或 tiktok.com/t/ 短链
             if (text.includes('tiktok.com')) {
-                const proxyEndpoints = [
-                    `https://api.allorigins.win/raw?url=${encodeURIComponent(text)}`,
-                    `https://corsproxy.io/?${encodeURIComponent(text)}`
-                ];
-
-                for (let proxyUrl of proxyEndpoints) {
-                    try {
-                        const res = await fetch(proxyUrl);
-                        if (res.ok) {
-                            const html = await res.text();
-                            // 从重定向网页的 HTML 元数据提取真正的视频 ID
-                            const vidMatch = html.match(/\/video\/(\d{15,22})/) || html.match(/"id":"(\d{15,22})"/);
-                            if (vidMatch && vidMatch[1]) {
-                                return vidMatch[1];
-                            }
+                // 通道一：TikWM 专用直解析引擎（专为处理短链设计，无视 CORS）
+                try {
+                    const res = await fetch(`https://www.tikwm.com/api/?url=${encodeURIComponent(text)}`);
+                    if (res.ok) {
+                        const json = await res.json();
+                        if (json && json.data && json.data.id) {
+                            return {
+                                id: json.data.id.toString(),
+                                title: json.data.title || '',
+                                channel: json.data.author ? '@' + (json.data.author.nickname || json.data.author.unique_id) : '',
+                                thumb: json.data.cover || json.data.origin_cover || ''
+                            };
                         }
-                    } catch (e) {
-                        console.warn("Proxy unshorten failed, trying next...", e);
                     }
+                } catch (e) {
+                    console.warn("TikWM 通道解析稍慢，切换备用通道...");
                 }
+
+                // 通道二：Unshorten 重定向反查
+                try {
+                    const res = await fetch(`https://unshorten.me/json/${encodeURIComponent(text)}`);
+                    if (res.ok) {
+                        const json = await res.json();
+                        if (json && json.resolved_url) {
+                            const m = json.resolved_url.match(/\/video\/(\d{15,22})/);
+                            if (m) return { id: m[1] };
+                        }
+                    }
+                } catch (e) {}
+
+                // 通道三：AllOrigins 深层 HTML 解包
+                try {
+                    const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(text)}`);
+                    if (res.ok) {
+                        const json = await res.json();
+                        if (json && json.status && json.status.url) {
+                            const m = json.status.url.match(/\/video\/(\d{15,22})/);
+                            if (m) return { id: m[1] };
+                        }
+                        if (json && json.contents) {
+                            const m = json.contents.match(/\/video\/(\d{15,22})/) || json.contents.match(/"id":"(\d{15,22})"/);
+                            if (m) return { id: m[1] };
+                        }
+                    }
+                } catch (e) {}
             }
             return null;
         }
@@ -703,18 +728,21 @@ def generate_index_template():
                 this.disabled = true;
 
                 try {
-                    // 解析短链与提取 Video ID
-                    const videoId = await resolveTikTokVideoId(url);
-                    if (!videoId) {
-                        throw new Error("无法从该链接解析出有效 Video ID。如为短链，建议在浏览器打开后复制跳转后的完整链接重试！");
+                    // 调用多通道短链解析引擎
+                    const videoMeta = await resolveTikTokVideoData(url);
+                    if (!videoMeta || !videoMeta.id) {
+                        throw new Error("无法从该短链中解析出 Video ID。请在手机/电脑浏览器中打开该短链，复制跳转后的完整长链接重新粘贴！");
                     }
 
+                    const videoId = videoMeta.id;
                     loadingBar.style.width = '35%';
-                    let videoTitle = `TikTok Video ${videoId}`;
-                    let videoChannel = "@TikTok Creator";
-                    let videoCover = "https://p16-va.tiktokcdn.com/obj/tos-maliva-p-0068/default_cover.jpeg";
+                    
+                    let videoTitle = videoMeta.title || `TikTok Video ${videoId}`;
+                    let videoChannel = videoMeta.channel || "@TikTok Creator";
+                    let videoCover = videoMeta.thumb || "https://p16-va.tiktokcdn.com/obj/tos-maliva-p-0068/default_cover.jpeg";
                     let videoUrl = `https://www.tiktok.com/video/${videoId}`;
 
+                    // 1. 尝试从 RapidAPI 补充最新视频详情
                     try {
                         const vRes = await fetch(`https://${rapidHost}/api/post/detail?videoId=${videoId}`, {
                             headers: { 'x-rapidapi-host': rapidHost, 'x-rapidapi-key': rapidKey }
@@ -733,6 +761,7 @@ def generate_index_template():
                     } catch(err) {}
 
                     loadingBar.style.width = '60%';
+                    // 2. 从 RapidAPI 获取视频评论列表
                     const cRes = await fetch(`https://${rapidHost}/api/post/comments?videoId=${videoId}&count=40&cursor=0`, {
                         headers: { 'x-rapidapi-host': rapidHost, 'x-rapidapi-key': rapidKey }
                     });
@@ -915,7 +944,7 @@ def generate_index_template():
         .anno-toggle:hover, .ai-toggle:hover { opacity: 0.8; transform: scale(1.1); }
         .anno-toggle.has-anno { opacity: 1; }
         .ai-toggle.loading::after { content: "⏳"; display: inline-block; animation: spin 1s linear infinite; }
-        @keyframes spin {{ 100% { transform: rotate(360deg); } }}
+        @keyframes spin { 100% { transform: rotate(360deg); } }
         
         .anno-box { display: none; margin-top: 8px; width: 100%; box-sizing: border-box; background: #fff; border-left: 3px solid var(--accent); padding: 12px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
         .anno-view { font-size: 0.95rem; line-height: 1.5; color: #333; }
@@ -966,7 +995,7 @@ def generate_index_template():
     os.makedirs(BASE_DIR, exist_ok=True)
     with open(os.path.join(BASE_DIR, "index.html"), "w", encoding="utf-8") as f:
         f.write(html_template)
-    print("✅ `docs/index.html` 纯客户端日历枢纽构建完成（支持短链解析）！")
+    print("✅ `docs/index.html` 纯客户端日历枢纽已构建（已集成 TikWM 极速短链解析引擎）！")
 
 if __name__ == "__main__":
     generate_index_template()
