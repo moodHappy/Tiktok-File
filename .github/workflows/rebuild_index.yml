@@ -1,10 +1,21 @@
 name: Rebuild TikTok Vibe Calendar Index
 
-# 触发条件：每周一自动运行 + 支持网页上手动点击运行
+# 触发条件：
+# 1. 监测到任何 .py 文件发生 push 推送时自动触发
+# 2. 每周一自动运行
+# 3. 允许在 GitHub 网页手动点击触发
 on:
+  push:
+    paths:
+      - '**.py'          # 只要有任何 Python 文件变动并推送就触发
+      - 'requirements.txt' # (可选) 依赖变动时也触发
+    branches:
+      - main             # 你的主分支名（如果是 master 请改成 master）
+
   schedule:
     - cron: '0 0 * * 1'  # 每周一 UTC 00:00 (北京时间早上 8:00) 运行
-  workflow_dispatch:     # 允许在 GitHub Actions 页面手动点击 "Run workflow"
+
+  workflow_dispatch:     # 允许在 Actions 页面手动点击 "Run workflow"
 
 jobs:
   build:
@@ -36,5 +47,6 @@ jobs:
           # 追踪 docs 及所有子文件夹变动
           git add .
           
-          # 如果有新归档或 index.html 变动，自动提交并推送
+          # 如果 index.html 或归档有变动，自动提交推送；
+          # 加上 [skip ci] 可以防止机器人自动提交后又重复死循环触发 Actions
           git diff --quiet && git diff --staged --quiet || (git commit -m "Auto rebuild TikTok vibe calendar index [skip ci]" && git push)
