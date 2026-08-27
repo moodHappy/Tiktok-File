@@ -1,4 +1,3 @@
-
 import os
 import json
 import base64
@@ -7,7 +6,7 @@ import html
 import requests
 from datetime import datetime, timezone, timedelta
 
-# ================= 配置區 =================
+# ================= 配置区 =================
 BASE_DIR = "docs"
 REPO_NAME = "Tiktok-File"
 tz_utc_8 = timezone(timedelta(hours=8))
@@ -354,7 +353,8 @@ def generate_index_template():
     json_data = json.dumps(archive_data)
     engine_b64 = base64.b64encode(ENGINE_SCRIPT.encode('utf-8')).decode('utf-8')
 
-    html_template = """<!DOCTYPE html>
+    # 【修复重点】：增加 r 前缀将 html_template 声明为原始字符串，防止 JavaScript 中的 \b、\d 被错误转义！
+    html_template = r"""<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -652,53 +652,83 @@ def generate_index_template():
             let match = text.match(/\/video\/(\d{15,22})/);
             if (match) return { id: match[1] };
 
-            // 3. 如果包含独立的 18~21 位数字
-            let matchAlt = text.match(/\b\d{18,21}\b/);
+            // 3. 增强正则：匹配游离的15到22位数字ID
+            let matchAlt = text.match(/\b\d{15,22}\b/);
             if (matchAlt) return { id: matchAlt[0] };
 
-            // 4. 如果是 vt.tiktok.com 或 vm.tiktok.com 或 tiktok.com/t/ 短链
-            if (text.includes('tiktok.com')) {
-                // 通道一：TikWM 专用直解析引擎（专为处理短链设计，无视 CORS）
+            // 4. 如果是 vt.tiktok.com 或 vm.tiktok.com 或 v.douyin.com 等短链
+            if (text.includes('tiktok.com') || text.includes('douyin.com')) {
+                
+                // 【通道一】：Lovetik 极速解析引擎 (最强无头解析，专治短链跨域)
+                try {
+                    const formData = new URLSearchParams();
+                    formData.append('query', text);
+                    const res = await fetch('https://lovetik.com/api/ajax/search', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: formData.toString()
+                    });
+                    if (res.ok) {
+                        const json = await res.json();
+                        if (json && json.vid) {
+                            return {
+                                id: String(json.vid),
+                                title: json.desc || '',
+                                channel: json.author ? '@' + json.author : '',
+                                thumb: json.cover || ''
+                            };
+                        }
+                    }
+                } catch (e) { console.warn("Lovetik 通道受阻:", e); }
+
+                // 【通道二】：TikWM 直解析引擎 (原主力，作为备用)
                 try {
                     const res = await fetch(`https://www.tikwm.com/api/?url=${encodeURIComponent(text)}`);
                     if (res.ok) {
                         const json = await res.json();
                         if (json && json.data && json.data.id) {
                             return {
-                                id: json.data.id.toString(),
+                                id: String(json.data.id),
                                 title: json.data.title || '',
                                 channel: json.data.author ? '@' + (json.data.author.nickname || json.data.author.unique_id) : '',
                                 thumb: json.data.cover || json.data.origin_cover || ''
                             };
                         }
                     }
-                } catch (e) {
-                    console.warn("TikWM 通道解析稍慢，切换备用通道...");
-                }
+                } catch (e) { console.warn("TikWM 通道受阻:", e); }
+                
+                // 【通道三】：Codetabs Proxy 网页源码正则反查 (高成功率兜底)
+                try {
+                    const res = await fetch(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(text)}`);
+                    if (res.ok) {
+                        const html = await res.text();
+                        const m = html.match(/"aweme_id":"(\d{15,22})"/);
+                        if (m) return { id: m[1] };
+                    }
+                } catch (e) { console.warn("Codetabs 通道受阻:", e); }
 
-                // 通道二：Unshorten 重定向反查
+                // 【通道四】：AllOrigins 深层 HTML 解包 (借助官方 oEmbed 穿透)
+                try {
+                    const oembedUrl = `https://www.tiktok.com/oembed?url=${encodeURIComponent(text)}`;
+                    const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(oembedUrl)}`);
+                    if (res.ok) {
+                        const json = await res.json();
+                        if (json && json.contents) {
+                            const oData = JSON.parse(json.contents);
+                            let embedUrl = oData.embed_url || oData.html || "";
+                            const m = embedUrl.match(/\/video\/(\d{15,22})/);
+                            if (m) return { id: m[1] };
+                        }
+                    }
+                } catch (e) { console.warn("oEmbed 通道受阻:", e); }
+
+                // 【通道五】：Unshorten 简单重定向反查
                 try {
                     const res = await fetch(`https://unshorten.me/json/${encodeURIComponent(text)}`);
                     if (res.ok) {
                         const json = await res.json();
                         if (json && json.resolved_url) {
                             const m = json.resolved_url.match(/\/video\/(\d{15,22})/);
-                            if (m) return { id: m[1] };
-                        }
-                    }
-                } catch (e) {}
-
-                // 通道三：AllOrigins 深层 HTML 解包
-                try {
-                    const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(text)}`);
-                    if (res.ok) {
-                        const json = await res.json();
-                        if (json && json.status && json.status.url) {
-                            const m = json.status.url.match(/\/video\/(\d{15,22})/);
-                            if (m) return { id: m[1] };
-                        }
-                        if (json && json.contents) {
-                            const m = json.contents.match(/\/video\/(\d{15,22})/) || json.contents.match(/"id":"(\d{15,22})"/);
                             if (m) return { id: m[1] };
                         }
                     }
@@ -978,7 +1008,7 @@ def generate_index_template():
             </div>
         </div>
         <div class="chat-container">
-            ${comments_html ? comments_html : '<div class="empty-state">暫無高價值評論。</div>'}
+            ${comments_html ? comments_html : '<div class="empty-state">暫無高价值评论。</div>'}
         </div>
     </div>
     <script id="page-data" type="application/json">${pageDataStr}<` + `/script>
@@ -996,7 +1026,7 @@ def generate_index_template():
     os.makedirs(BASE_DIR, exist_ok=True)
     with open(os.path.join(BASE_DIR, "index.html"), "w", encoding="utf-8") as f:
         f.write(html_template)
-    print("✅ `docs/index.html` 纯客户端日历枢纽已构建（已集成 TikWM 极速短链解析引擎）！")
+    print("✅ `docs/index.html` 纯客户端日历枢纽已构建（已集成 5通道 极速短链解析引擎）！")
 
 if __name__ == "__main__":
     generate_index_template()
