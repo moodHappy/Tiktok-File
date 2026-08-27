@@ -128,15 +128,16 @@ function initAnnotations() {
                 e.preventDefault(); e.stopPropagation();
                 if (aiToggle.classList.contains('loading')) return;
 
-                // 【需求一】：如果有已有批注，提示是否覆盖，选否直接中止
-                if (edit.value.trim().length > 0) {
-                    const confirmOverwrite = confirm('⚠️ 当前已有批注内容，是否重新生成并覆盖？');
-                    if (!confirmOverwrite) return;
-                }
-
                 const groqKey = localStorage.getItem('GROQ_API_KEY') || '';
                 const glmKey = localStorage.getItem('GLM_API_KEY') || '';
                 if (!groqKey && !glmKey) { alert('⚠️ 请先返回日历配置中心设置 AI API Key！'); return; }
+
+                // 批注防覆盖保护：已有批注时提示用户
+                if (edit.value.trim() !== '') {
+                    if (!confirm('该评论已有批注，是否确定覆盖？\n(选“取消”则保留原有批注，避免误触浪费额度)')) {
+                        return; // 用户点击取消，直接中止请求
+                    }
+                }
 
                 const pClone = wrap.querySelector('.card-text').cloneNode(true);
                 pClone.querySelectorAll('.anno-toggle, .ai-toggle').forEach(el => el.remove());
@@ -377,12 +378,10 @@ def generate_index_template():
         
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 100; justify-content: center; align-items: center; padding: 20px; }
         .modal-content { background: var(--card); border-radius: 16px; padding: 20px; width: 100%; max-width: 400px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); max-height: 85vh; overflow-y: auto; }
-        .modal-title { margin: 0 0 15px 0; font-size: 18px; font-weight: bold; color: #1c1e21; }
+        .modal-title { margin: 0 0 15px 0; font-size: 18px; font-weight: bold; }
         .form-group { margin-bottom: 15px; }
         .form-group label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 5px; font-weight: bold; }
-        .form-group input, .form-group select { width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; background: #fff !important; color: #333 !important; }
-        .form-group select { cursor: pointer; height: 42px; line-height: 1.5; -webkit-appearance: menulist; appearance: menulist; }
-        .form-group select option { background: #fff !important; color: #333 !important; }
+        .form-group input, .form-group select { width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; }
         .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
         .btn { padding: 8px 16px; border-radius: 8px; border: none; font-size: 14px; font-weight: bold; cursor: pointer; }
         .btn-cancel { background: #eee; color: #333; }
@@ -391,7 +390,7 @@ def generate_index_template():
         .controls { background: var(--bg); padding: 15px 20px; display: flex; justify-content: center; align-items: center; gap: 8px; border-bottom: 1px solid var(--border); }
         .control-btn { background: var(--primary); color: #fff; border: none; border-radius: 6px; padding: 8px 12px; font-size: 14px; cursor: pointer; font-weight: bold; transition: all 0.2s; }
         .control-btn:active { opacity: 0.8; transform: scale(0.95); }
-        .select-box { padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 15px; background: #fff; outline: none; font-weight: bold; cursor: pointer; color: #333; }
+        .select-box { padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 15px; background: #fff; outline: none; font-weight: bold; cursor: pointer; }
         .calendar-wrapper { background: var(--card); padding: 15px; margin-bottom: 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
         .weekdays { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-weight: bold; font-size: 13px; color: var(--muted); margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #f0f0f0; }
         .days-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
@@ -413,26 +412,10 @@ def generate_index_template():
         
         .empty-state { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 14px; background: var(--card); border-radius: 14px; }
         #loadingBar { height: 3px; background: var(--primary); width: 0%; transition: width 0.3s; position: absolute; top: 0; left: 0; z-index: 30; }
-
-        /* 居中自闭合弹窗卡片 */
-        .center-popup { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); z-index: 999; justify-content: center; align-items: center; }
-        .center-popup-card { background: #fff; border-radius: 20px; padding: 24px 30px; text-align: center; box-shadow: 0 15px 35px rgba(0,0,0,0.15); max-width: 280px; width: 80%; animation: popIn 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
-        .center-popup-icon { font-size: 38px; margin-bottom: 10px; line-height: 1; }
-        .center-popup-text { font-size: 16px; font-weight: bold; color: #222; margin: 0; }
-        @keyframes popIn { 0% { transform: scale(0.85); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
     </style>
 </head>
 <body>
     <div id="loadingBar"></div>
-
-    <!-- 居中自动关闭提示卡片 -->
-    <div class="center-popup" id="centerPopup">
-        <div class="center-popup-card">
-            <div class="center-popup-icon">✅</div>
-            <p class="center-popup-text" id="centerPopupText">配置已本地保存！</p>
-        </div>
-    </div>
-
     <div class="manual-fetch-bar">
         <input type="text" id="tiktokUrlInput" class="fetch-input" placeholder="粘贴 TikTok 任意链接 (支持 vt.tiktok.com 短链)，回车抓取..." autocomplete="off">
         <button class="settings-btn" id="openSettingsBtn">⚙️</button>
@@ -454,13 +437,7 @@ def generate_index_template():
             </div>
 
             <div style="border-top:1px dashed #ddd; margin: 15px 0;"></div>
-            <div class="form-group">
-                <label>首选 AI 引擎 (批注助手)</label>
-                <select id="cfgPrefAI">
-                    <option value="groq">Groq (推荐/响应快)</option>
-                    <option value="glm">智谱 (GLM)</option>
-                </select>
-            </div>
+            <div class="form-group"><label>首选 AI 引擎 (批注助手)</label><select id="cfgPrefAI"><option value="groq">Groq</option><option value="glm">智谱</option></select></div>
             <div class="form-group" style="display:flex; gap:10px;">
                 <div style="flex:1;"><label>Groq Key</label><input type="password" id="cfgGroq" placeholder="gsk_..."></div>
                 <div style="flex:1;"><label>Groq 模型</label><input type="text" id="cfgGroqModel" placeholder="llama-3.3-70b-versatile"></div>
@@ -501,17 +478,6 @@ def generate_index_template():
         const archiveData = /*DATA_START*/REPLACEME_JSON_DATA/*DATA_END*/;
         const today = new Date();
         const AppState = { year: today.getFullYear(), month: today.getMonth() + 1, day: today.getDate(), deleteMode: false };
-
-        // 居中弹出卡片，展示后自动关闭自身并执行回调
-        function triggerAutoPopup(text, duration = 1200, callback = null) {
-            const popup = document.getElementById('centerPopup');
-            document.getElementById('centerPopupText').innerText = text;
-            popup.style.display = 'flex';
-            setTimeout(() => {
-                popup.style.display = 'none';
-                if (callback) callback();
-            }, duration);
-        }
 
         function initSelects() {
             const yearSelect = document.getElementById('yearSelect');
@@ -618,10 +584,17 @@ def generate_index_template():
             document.getElementById('cfgGhToken').value = localStorage.getItem('GH_TOKEN') || '';
             document.getElementById('cfgGhOwner').value = localStorage.getItem('GH_OWNER') || '';
             
-            // 首选 AI 引擎回显
-            const savedPref = localStorage.getItem('PREFERRED_AI') || 'groq';
-            document.getElementById('cfgPrefAI').value = (savedPref === 'glm') ? 'glm' : 'groq';
-
+            // 确保 Select 根据本地存储值正确选中某一个选项
+            const prefAI = localStorage.getItem('PREFERRED_AI') || 'groq';
+            const selectEl = document.getElementById('cfgPrefAI');
+            selectEl.value = prefAI;
+            for (let i = 0; i < selectEl.options.length; i++) {
+                if (selectEl.options[i].value === prefAI) {
+                    selectEl.selectedIndex = i;
+                    break;
+                }
+            }
+            
             document.getElementById('cfgGroq').value = localStorage.getItem('GROQ_API_KEY') || '';
             document.getElementById('cfgGroqModel').value = localStorage.getItem('GROQ_MODEL') || 'llama-3.3-70b-versatile';
             document.getElementById('cfgGLM').value = localStorage.getItem('GLM_API_KEY') || '';
@@ -631,7 +604,6 @@ def generate_index_template():
 
         document.getElementById('closeSettingsBtn').addEventListener('click', () => { document.getElementById('settingsModal').style.display = 'none'; });
 
-        // 点击保存配置：弹出卡片 -> 1.2秒后自动关闭提示并关闭配置窗
         document.getElementById('saveSettingsBtn').addEventListener('click', () => {
             localStorage.setItem('RAPIDAPI_KEY', document.getElementById('cfgRapidKey').value.trim());
             localStorage.setItem('RAPIDAPI_HOST', document.getElementById('cfgRapidHost').value.trim() || 'tiktok-api23.p.rapidapi.com');
@@ -643,9 +615,9 @@ def generate_index_template():
             localStorage.setItem('GLM_API_KEY', document.getElementById('cfgGLM').value.trim());
             localStorage.setItem('GLM_MODEL', document.getElementById('cfgGLMModel').value.trim());
             
-            triggerAutoPopup('配置已本地保存！', 1200, () => {
-                document.getElementById('settingsModal').style.display = 'none';
-            });
+            // 先弹窗阻断，用户点击“确定”后再执行关闭操作
+            alert('配置已本地保存！');
+            document.getElementById('settingsModal').style.display = 'none';
         });
 
         async function syncDeleteToGithub(fileRelPath) {
@@ -703,10 +675,10 @@ def generate_index_template():
             let matchAlt = text.match(/\b\d{15,22}\b/);
             if (matchAlt) return { id: matchAlt[0] };
 
-            // 4. 如果是 vt.tiktok.com 或 vm.tiktok.com 等短链
+            // 4. 如果是 vt.tiktok.com 或 vm.tiktok.com 或 v.douyin.com 等短链
             if (text.includes('tiktok.com') || text.includes('douyin.com')) {
                 
-                // 【通道一】：Lovetik 极速解析引擎
+                // 【通道一】：Lovetik 极速解析引擎 (最强无头解析，专治短链跨域)
                 try {
                     const formData = new URLSearchParams();
                     formData.append('query', text);
@@ -728,7 +700,7 @@ def generate_index_template():
                     }
                 } catch (e) { console.warn("Lovetik 通道受阻:", e); }
 
-                // 【通道二】：TikWM 直解析引擎
+                // 【通道二】：TikWM 直解析引擎 (原主力，作为备用)
                 try {
                     const res = await fetch(`https://www.tikwm.com/api/?url=${encodeURIComponent(text)}`);
                     if (res.ok) {
@@ -744,7 +716,7 @@ def generate_index_template():
                     }
                 } catch (e) { console.warn("TikWM 通道受阻:", e); }
                 
-                // 【通道三】：Codetabs Proxy 网页源码正则反查
+                // 【通道三】：Codetabs Proxy 网页源码正则反查 (高成功率兜底)
                 try {
                     const res = await fetch(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(text)}`);
                     if (res.ok) {
@@ -754,7 +726,7 @@ def generate_index_template():
                     }
                 } catch (e) { console.warn("Codetabs 通道受阻:", e); }
 
-                // 【通道四】：AllOrigins 深层 HTML 解包
+                // 【通道四】：AllOrigins 深层 HTML 解包 (借助官方 oEmbed 穿透)
                 try {
                     const oembedUrl = `https://www.tiktok.com/oembed?url=${encodeURIComponent(text)}`;
                     const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(oembedUrl)}`);
@@ -806,6 +778,7 @@ def generate_index_template():
                 this.disabled = true;
 
                 try {
+                    // 调用多通道短链解析引擎
                     const videoMeta = await resolveTikTokVideoData(url);
                     if (!videoMeta || !videoMeta.id) {
                         throw new Error("无法从该短链中解析出 Video ID。请在手机/电脑浏览器中打开该短链，复制跳转后的完整长链接重新粘贴！");
@@ -819,6 +792,7 @@ def generate_index_template():
                     let videoCover = videoMeta.thumb || "https://p16-va.tiktokcdn.com/obj/tos-maliva-p-0068/default_cover.jpeg";
                     let videoUrl = `https://www.tiktok.com/video/${videoId}`;
 
+                    // 1. 尝试从 RapidAPI 补充最新视频详情
                     try {
                         const vRes = await fetch(`https://${rapidHost}/api/post/detail?videoId=${videoId}`, {
                             headers: { 'x-rapidapi-host': rapidHost, 'x-rapidapi-key': rapidKey }
@@ -837,6 +811,7 @@ def generate_index_template():
                     } catch(err) {}
 
                     loadingBar.style.width = '60%';
+                    // 2. 从 RapidAPI 获取视频评论列表
                     const cRes = await fetch(`https://${rapidHost}/api/post/comments?videoId=${videoId}&count=40&cursor=0`, {
                         headers: { 'x-rapidapi-host': rapidHost, 'x-rapidapi-key': rapidKey }
                     });
@@ -914,7 +889,7 @@ def generate_index_template():
 
                     forceRender(); 
                     loadingBar.style.width = '100%';
-                    triggerAutoPopup('🎉 抓取并归档成功！', 1500);
+                    alert('🎉 抓取成功！TikTok 潮语精读单集已自动归档并同步至云端。');
                     this.value = '';
                     setTimeout(() => { loadingBar.style.width = '0%'; }, 1500);
                 } catch (err) {
@@ -1070,7 +1045,7 @@ def generate_index_template():
     os.makedirs(BASE_DIR, exist_ok=True)
     with open(os.path.join(BASE_DIR, "index.html"), "w", encoding="utf-8") as f:
         f.write(html_template)
-    print("✅ `docs/index.html` 纯客户端日历枢纽已构建并完成全套交互升级！")
+    print("✅ `docs/index.html` 纯客户端日历枢纽已构建（已集成 5通道 极速短链解析引擎）！")
 
 if __name__ == "__main__":
     generate_index_template()
