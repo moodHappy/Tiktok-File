@@ -128,11 +128,10 @@ function initAnnotations() {
                 e.preventDefault(); e.stopPropagation();
                 if (aiToggle.classList.contains('loading')) return;
 
-                // 批注覆盖确认保护机制
-                if (edit.value.trim() !== '') {
-                    if (!confirm('⚠️ 该评论已有批注，是否让 AI 重新生成并覆盖原内容？\n(点击取消则保留原批注)')) {
-                        return;
-                    }
+                // 【需求一】：如果有已有批注，提示是否覆盖，选否直接中止
+                if (edit.value.trim().length > 0) {
+                    const confirmOverwrite = confirm('⚠️ 当前已有批注内容，是否重新生成并覆盖？');
+                    if (!confirmOverwrite) return;
                 }
 
                 const groqKey = localStorage.getItem('GROQ_API_KEY') || '';
@@ -276,7 +275,7 @@ function reconstructSelfHTML() {
             </div>
         </div>
         <div class="chat-container">
-            ${comments_html ? comments_html : '<div class="empty-state">暫無高价值评论。</div>'}
+            ${comments_html ? comments_html : '<div class="empty-state">暫無高價值評論。</div>'}
         </div>
     </div>
     <script id="page-data" type="application/json">${newJsonStr}<\/script>
@@ -382,8 +381,7 @@ def generate_index_template():
         .form-group { margin-bottom: 15px; }
         .form-group label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 5px; font-weight: bold; }
         .form-group input, .form-group select { width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; background: #fff; color: #333; }
-        /* 强制修复 select 的下拉箭头和选中状态显示 */
-        .form-group select { -webkit-appearance: menulist; appearance: menulist; cursor: pointer; }
+        .form-group select { cursor: pointer; }
         .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
         .btn { padding: 8px 16px; border-radius: 8px; border: none; font-size: 14px; font-weight: bold; cursor: pointer; }
         .btn-cancel { background: #eee; color: #333; }
@@ -392,7 +390,7 @@ def generate_index_template():
         .controls { background: var(--bg); padding: 15px 20px; display: flex; justify-content: center; align-items: center; gap: 8px; border-bottom: 1px solid var(--border); }
         .control-btn { background: var(--primary); color: #fff; border: none; border-radius: 6px; padding: 8px 12px; font-size: 14px; cursor: pointer; font-weight: bold; transition: all 0.2s; }
         .control-btn:active { opacity: 0.8; transform: scale(0.95); }
-        .select-box { padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 15px; background: #fff; outline: none; font-weight: bold; cursor: pointer; color: #333;}
+        .select-box { padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 15px; background: #fff; outline: none; font-weight: bold; cursor: pointer; color: #333; }
         .calendar-wrapper { background: var(--card); padding: 15px; margin-bottom: 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
         .weekdays { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-weight: bold; font-size: 13px; color: var(--muted); margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #f0f0f0; }
         .days-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
@@ -414,10 +412,16 @@ def generate_index_template():
         
         .empty-state { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 14px; background: var(--card); border-radius: 14px; }
         #loadingBar { height: 3px; background: var(--primary); width: 0%; transition: width 0.3s; position: absolute; top: 0; left: 0; z-index: 30; }
+
+        /* 全局轻量 Toast 提示 */
+        #toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(20px); background: rgba(0, 0, 0, 0.85); color: #fff; padding: 10px 20px; border-radius: 25px; font-size: 14px; font-weight: bold; z-index: 9999; opacity: 0; transition: all 0.3s ease; pointer-events: none; white-space: nowrap; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
     </style>
 </head>
 <body>
     <div id="loadingBar"></div>
+    <div id="toast"></div>
+
     <div class="manual-fetch-bar">
         <input type="text" id="tiktokUrlInput" class="fetch-input" placeholder="粘贴 TikTok 任意链接 (支持 vt.tiktok.com 短链)，回车抓取..." autocomplete="off">
         <button class="settings-btn" id="openSettingsBtn">⚙️</button>
@@ -439,7 +443,13 @@ def generate_index_template():
             </div>
 
             <div style="border-top:1px dashed #ddd; margin: 15px 0;"></div>
-            <div class="form-group"><label>首选 AI 引擎 (批注助手)</label><select id="cfgPrefAI"><option value="groq">Groq</option><option value="glm">智谱</option></select></div>
+            <div class="form-group">
+                <label>首选 AI 引擎 (批注助手)</label>
+                <select id="cfgPrefAI">
+                    <option value="groq">Groq (推荐/响应快)</option>
+                    <option value="glm">智谱 (GLM)</option>
+                </select>
+            </div>
             <div class="form-group" style="display:flex; gap:10px;">
                 <div style="flex:1;"><label>Groq Key</label><input type="password" id="cfgGroq" placeholder="gsk_..."></div>
                 <div style="flex:1;"><label>Groq 模型</label><input type="text" id="cfgGroqModel" placeholder="llama-3.3-70b-versatile"></div>
@@ -456,23 +466,41 @@ def generate_index_template():
         </div>
     </div>
 
-    <script>
-        // 优雅的全局 Toast 提示组件
-        function showToast(msg) {
-            const toast = document.createElement('div');
-            toast.textContent = msg;
-            toast.style.cssText = 'position:fixed; top:20px; left:50%; transform:translateX(-50%); background:#2ea44f; color:#fff; padding:10px 20px; border-radius:20px; font-size:14px; font-weight:bold; z-index:9999; box-shadow:0 4px 12px rgba(0,0,0,0.15); opacity:0; transition:opacity 0.3s; pointer-events:none;';
-            document.body.appendChild(toast);
-            setTimeout(() => toast.style.opacity = '1', 10);
-            setTimeout(() => {
-                toast.style.opacity = '0';
-                setTimeout(() => toast.remove(), 300);
-            }, 2000);
-        }
+    <div class="container">
+        <div class="controls">
+            <button class="control-btn" id="prevBtn">&lt;</button>
+            <select class="select-box" id="yearSelect"></select>
+            <select class="select-box" id="monthSelect">
+                <option value="1">01月</option><option value="2">02月</option><option value="3">03月</option>
+                <option value="4">04月</option><option value="5">05月</option><option value="6">06月</option>
+                <option value="7">07月</option><option value="8">08月</option><option value="9">09月</option>
+                <option value="10">10月</option><option value="11">11月</option><option value="12">12月</option>
+            </select>
+            <button class="control-btn" id="nextBtn">&gt;</button>
+            <button class="control-btn" id="todayBtn">今天</button>
+        </div>
+        <div class="calendar-wrapper">
+            <div class="weekdays"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
+            <div class="days-grid" id="daysGrid"></div>
+        </div>
+        <div class="news-section"><div id="newsList"></div></div>
+    </div>
 
+    <script>
         const archiveData = /*DATA_START*/REPLACEME_JSON_DATA/*DATA_END*/;
         const today = new Date();
         const AppState = { year: today.getFullYear(), month: today.getMonth() + 1, day: today.getDate(), deleteMode: false };
+
+        let toastTimeout = null;
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.innerText = msg;
+            toast.classList.add('show');
+            if (toastTimeout) clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toast.classList.remove('show');
+            }, 2000);
+        }
 
         function initSelects() {
             const yearSelect = document.getElementById('yearSelect');
@@ -578,42 +606,34 @@ def generate_index_template():
             document.getElementById('cfgRapidHost').value = localStorage.getItem('RAPIDAPI_HOST') || 'tiktok-api23.p.rapidapi.com';
             document.getElementById('cfgGhToken').value = localStorage.getItem('GH_TOKEN') || '';
             document.getElementById('cfgGhOwner').value = localStorage.getItem('GH_OWNER') || '';
+            
+            // 【需求二】：确保首选 AI 引擎能正确读取并高亮选中
+            const savedPref = localStorage.getItem('PREFERRED_AI') || 'groq';
+            document.getElementById('cfgPrefAI').value = (savedPref === 'glm') ? 'glm' : 'groq';
+
             document.getElementById('cfgGroq').value = localStorage.getItem('GROQ_API_KEY') || '';
             document.getElementById('cfgGroqModel').value = localStorage.getItem('GROQ_MODEL') || 'llama-3.3-70b-versatile';
             document.getElementById('cfgGLM').value = localStorage.getItem('GLM_API_KEY') || '';
             document.getElementById('cfgGLMModel').value = localStorage.getItem('GLM_MODEL') || 'GLM-4.5-Flash';
-            
-            // 确保下拉框有默认选中，且不会显示空白
-            const savedAI = localStorage.getItem('PREFERRED_AI');
-            const selectEl = document.getElementById('cfgPrefAI');
-            if (savedAI === 'glm' || savedAI === 'groq') {
-                selectEl.value = savedAI;
-            } else {
-                selectEl.value = 'groq';
-            }
-            
             document.getElementById('settingsModal').style.display = 'flex';
         });
 
         document.getElementById('closeSettingsBtn').addEventListener('click', () => { document.getElementById('settingsModal').style.display = 'none'; });
 
+        // 【需求三】：保存后直接关闭窗口，并以 Toast 提示代替原生 alert 弹窗
         document.getElementById('saveSettingsBtn').addEventListener('click', () => {
             localStorage.setItem('RAPIDAPI_KEY', document.getElementById('cfgRapidKey').value.trim());
             localStorage.setItem('RAPIDAPI_HOST', document.getElementById('cfgRapidHost').value.trim() || 'tiktok-api23.p.rapidapi.com');
             localStorage.setItem('GH_TOKEN', document.getElementById('cfgGhToken').value.trim());
             localStorage.setItem('GH_OWNER', document.getElementById('cfgGhOwner').value.trim());
-            
-            let prefAI = document.getElementById('cfgPrefAI').value;
-            localStorage.setItem('PREFERRED_AI', prefAI ? prefAI : 'groq');
-            
+            localStorage.setItem('PREFERRED_AI', document.getElementById('cfgPrefAI').value);
             localStorage.setItem('GROQ_API_KEY', document.getElementById('cfgGroq').value.trim());
             localStorage.setItem('GROQ_MODEL', document.getElementById('cfgGroqModel').value.trim());
             localStorage.setItem('GLM_API_KEY', document.getElementById('cfgGLM').value.trim());
             localStorage.setItem('GLM_MODEL', document.getElementById('cfgGLMModel').value.trim());
             
             document.getElementById('settingsModal').style.display = 'none';
-            // 使用优雅的 Toast 提示代替 alert
-            showToast('✅ 配置已成功保存！');
+            showToast('✅ 配置已成功保存至本地！');
         });
 
         async function syncDeleteToGithub(fileRelPath) {
@@ -671,10 +691,10 @@ def generate_index_template():
             let matchAlt = text.match(/\b\d{15,22}\b/);
             if (matchAlt) return { id: matchAlt[0] };
 
-            // 4. 如果是 vt.tiktok.com 或 vm.tiktok.com 或 v.douyin.com 等短链
+            // 4. 如果是 vt.tiktok.com 或 vm.tiktok.com 等短链
             if (text.includes('tiktok.com') || text.includes('douyin.com')) {
                 
-                // 【通道一】：Lovetik 极速解析引擎 (最强无头解析，专治短链跨域)
+                // 【通道一】：Lovetik 极速解析引擎
                 try {
                     const formData = new URLSearchParams();
                     formData.append('query', text);
@@ -696,7 +716,7 @@ def generate_index_template():
                     }
                 } catch (e) { console.warn("Lovetik 通道受阻:", e); }
 
-                // 【通道二】：TikWM 直解析引擎 (原主力，作为备用)
+                // 【通道二】：TikWM 直解析引擎
                 try {
                     const res = await fetch(`https://www.tikwm.com/api/?url=${encodeURIComponent(text)}`);
                     if (res.ok) {
@@ -712,7 +732,7 @@ def generate_index_template():
                     }
                 } catch (e) { console.warn("TikWM 通道受阻:", e); }
                 
-                // 【通道三】：Codetabs Proxy 网页源码正则反查 (高成功率兜底)
+                // 【通道三】：Codetabs Proxy 网页源码正则反查
                 try {
                     const res = await fetch(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(text)}`);
                     if (res.ok) {
@@ -722,7 +742,7 @@ def generate_index_template():
                     }
                 } catch (e) { console.warn("Codetabs 通道受阻:", e); }
 
-                // 【通道四】：AllOrigins 深层 HTML 解包 (借助官方 oEmbed 穿透)
+                // 【通道四】：AllOrigins 深层 HTML 解包
                 try {
                     const oembedUrl = `https://www.tiktok.com/oembed?url=${encodeURIComponent(text)}`;
                     const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(oembedUrl)}`);
@@ -774,7 +794,6 @@ def generate_index_template():
                 this.disabled = true;
 
                 try {
-                    // 调用多通道短链解析引擎
                     const videoMeta = await resolveTikTokVideoData(url);
                     if (!videoMeta || !videoMeta.id) {
                         throw new Error("无法从该短链中解析出 Video ID。请在手机/电脑浏览器中打开该短链，复制跳转后的完整长链接重新粘贴！");
@@ -788,7 +807,6 @@ def generate_index_template():
                     let videoCover = videoMeta.thumb || "https://p16-va.tiktokcdn.com/obj/tos-maliva-p-0068/default_cover.jpeg";
                     let videoUrl = `https://www.tiktok.com/video/${videoId}`;
 
-                    // 1. 尝试从 RapidAPI 补充最新视频详情
                     try {
                         const vRes = await fetch(`https://${rapidHost}/api/post/detail?videoId=${videoId}`, {
                             headers: { 'x-rapidapi-host': rapidHost, 'x-rapidapi-key': rapidKey }
@@ -807,7 +825,6 @@ def generate_index_template():
                     } catch(err) {}
 
                     loadingBar.style.width = '60%';
-                    // 2. 从 RapidAPI 获取视频评论列表
                     const cRes = await fetch(`https://${rapidHost}/api/post/comments?videoId=${videoId}&count=40&cursor=0`, {
                         headers: { 'x-rapidapi-host': rapidHost, 'x-rapidapi-key': rapidKey }
                     });
@@ -885,7 +902,7 @@ def generate_index_template():
 
                     forceRender(); 
                     loadingBar.style.width = '100%';
-                    showToast('🎉 抓取成功并归档云端！');
+                    showToast('🎉 抓取成功！TikTok 单集已自动归档！');
                     this.value = '';
                     setTimeout(() => { loadingBar.style.width = '0%'; }, 1500);
                 } catch (err) {
@@ -1023,7 +1040,7 @@ def generate_index_template():
             </div>
         </div>
         <div class="chat-container">
-            ${comments_html ? comments_html : '<div class="empty-state">暫无高价值评论。</div>'}
+            ${comments_html ? comments_html : '<div class="empty-state">暫無高价值评论。</div>'}
         </div>
     </div>
     <script id="page-data" type="application/json">${pageDataStr}<` + `/script>
@@ -1041,7 +1058,7 @@ def generate_index_template():
     os.makedirs(BASE_DIR, exist_ok=True)
     with open(os.path.join(BASE_DIR, "index.html"), "w", encoding="utf-8") as f:
         f.write(html_template)
-    print("✅ `docs/index.html` 纯客户端日历枢纽已构建（加入了 AI 误触保护、下拉框修复和全局 Toast）！")
+    print("✅ `docs/index.html` 纯客户端日历枢纽已构建并完成全面交互升级！")
 
 if __name__ == "__main__":
     generate_index_template()
