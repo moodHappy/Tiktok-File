@@ -377,11 +377,12 @@ def generate_index_template():
         
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 100; justify-content: center; align-items: center; padding: 20px; }
         .modal-content { background: var(--card); border-radius: 16px; padding: 20px; width: 100%; max-width: 400px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); max-height: 85vh; overflow-y: auto; }
-        .modal-title { margin: 0 0 15px 0; font-size: 18px; font-weight: bold; }
+        .modal-title { margin: 0 0 15px 0; font-size: 18px; font-weight: bold; color: #1c1e21; }
         .form-group { margin-bottom: 15px; }
         .form-group label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 5px; font-weight: bold; }
-        .form-group input, .form-group select { width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; background: #fff; color: #333; }
-        .form-group select { cursor: pointer; }
+        .form-group input, .form-group select { width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; background: #fff !important; color: #333 !important; }
+        .form-group select { cursor: pointer; height: 42px; line-height: 1.5; -webkit-appearance: menulist; appearance: menulist; }
+        .form-group select option { background: #fff !important; color: #333 !important; }
         .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
         .btn { padding: 8px 16px; border-radius: 8px; border: none; font-size: 14px; font-weight: bold; cursor: pointer; }
         .btn-cancel { background: #eee; color: #333; }
@@ -413,14 +414,24 @@ def generate_index_template():
         .empty-state { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 14px; background: var(--card); border-radius: 14px; }
         #loadingBar { height: 3px; background: var(--primary); width: 0%; transition: width 0.3s; position: absolute; top: 0; left: 0; z-index: 30; }
 
-        /* 全局轻量 Toast 提示 */
-        #toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(20px); background: rgba(0, 0, 0, 0.85); color: #fff; padding: 10px 20px; border-radius: 25px; font-size: 14px; font-weight: bold; z-index: 9999; opacity: 0; transition: all 0.3s ease; pointer-events: none; white-space: nowrap; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
-        #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        /* 居中自闭合弹窗卡片 */
+        .center-popup { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); z-index: 999; justify-content: center; align-items: center; }
+        .center-popup-card { background: #fff; border-radius: 20px; padding: 24px 30px; text-align: center; box-shadow: 0 15px 35px rgba(0,0,0,0.15); max-width: 280px; width: 80%; animation: popIn 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .center-popup-icon { font-size: 38px; margin-bottom: 10px; line-height: 1; }
+        .center-popup-text { font-size: 16px; font-weight: bold; color: #222; margin: 0; }
+        @keyframes popIn { 0% { transform: scale(0.85); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
     </style>
 </head>
 <body>
     <div id="loadingBar"></div>
-    <div id="toast"></div>
+
+    <!-- 居中自动关闭提示卡片 -->
+    <div class="center-popup" id="centerPopup">
+        <div class="center-popup-card">
+            <div class="center-popup-icon">✅</div>
+            <p class="center-popup-text" id="centerPopupText">配置已本地保存！</p>
+        </div>
+    </div>
 
     <div class="manual-fetch-bar">
         <input type="text" id="tiktokUrlInput" class="fetch-input" placeholder="粘贴 TikTok 任意链接 (支持 vt.tiktok.com 短链)，回车抓取..." autocomplete="off">
@@ -491,15 +502,15 @@ def generate_index_template():
         const today = new Date();
         const AppState = { year: today.getFullYear(), month: today.getMonth() + 1, day: today.getDate(), deleteMode: false };
 
-        let toastTimeout = null;
-        function showToast(msg) {
-            const toast = document.getElementById('toast');
-            toast.innerText = msg;
-            toast.classList.add('show');
-            if (toastTimeout) clearTimeout(toastTimeout);
-            toastTimeout = setTimeout(() => {
-                toast.classList.remove('show');
-            }, 2000);
+        // 居中弹出卡片，展示后自动关闭自身并执行回调
+        function triggerAutoPopup(text, duration = 1200, callback = null) {
+            const popup = document.getElementById('centerPopup');
+            document.getElementById('centerPopupText').innerText = text;
+            popup.style.display = 'flex';
+            setTimeout(() => {
+                popup.style.display = 'none';
+                if (callback) callback();
+            }, duration);
         }
 
         function initSelects() {
@@ -607,7 +618,7 @@ def generate_index_template():
             document.getElementById('cfgGhToken').value = localStorage.getItem('GH_TOKEN') || '';
             document.getElementById('cfgGhOwner').value = localStorage.getItem('GH_OWNER') || '';
             
-            // 【需求二】：确保首选 AI 引擎能正确读取并高亮选中
+            // 首选 AI 引擎回显
             const savedPref = localStorage.getItem('PREFERRED_AI') || 'groq';
             document.getElementById('cfgPrefAI').value = (savedPref === 'glm') ? 'glm' : 'groq';
 
@@ -620,7 +631,7 @@ def generate_index_template():
 
         document.getElementById('closeSettingsBtn').addEventListener('click', () => { document.getElementById('settingsModal').style.display = 'none'; });
 
-        // 【需求三】：保存后直接关闭窗口，并以 Toast 提示代替原生 alert 弹窗
+        // 点击保存配置：弹出卡片 -> 1.2秒后自动关闭提示并关闭配置窗
         document.getElementById('saveSettingsBtn').addEventListener('click', () => {
             localStorage.setItem('RAPIDAPI_KEY', document.getElementById('cfgRapidKey').value.trim());
             localStorage.setItem('RAPIDAPI_HOST', document.getElementById('cfgRapidHost').value.trim() || 'tiktok-api23.p.rapidapi.com');
@@ -632,8 +643,9 @@ def generate_index_template():
             localStorage.setItem('GLM_API_KEY', document.getElementById('cfgGLM').value.trim());
             localStorage.setItem('GLM_MODEL', document.getElementById('cfgGLMModel').value.trim());
             
-            document.getElementById('settingsModal').style.display = 'none';
-            showToast('✅ 配置已成功保存至本地！');
+            triggerAutoPopup('配置已本地保存！', 1200, () => {
+                document.getElementById('settingsModal').style.display = 'none';
+            });
         });
 
         async function syncDeleteToGithub(fileRelPath) {
@@ -902,7 +914,7 @@ def generate_index_template():
 
                     forceRender(); 
                     loadingBar.style.width = '100%';
-                    showToast('🎉 抓取成功！TikTok 单集已自动归档！');
+                    triggerAutoPopup('🎉 抓取并归档成功！', 1500);
                     this.value = '';
                     setTimeout(() => { loadingBar.style.width = '0%'; }, 1500);
                 } catch (err) {
@@ -1058,7 +1070,7 @@ def generate_index_template():
     os.makedirs(BASE_DIR, exist_ok=True)
     with open(os.path.join(BASE_DIR, "index.html"), "w", encoding="utf-8") as f:
         f.write(html_template)
-    print("✅ `docs/index.html` 纯客户端日历枢纽已构建并完成全面交互升级！")
+    print("✅ `docs/index.html` 纯客户端日历枢纽已构建并完成全套交互升级！")
 
 if __name__ == "__main__":
     generate_index_template()
