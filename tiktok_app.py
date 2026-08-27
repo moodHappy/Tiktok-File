@@ -1,5 +1,4 @@
 import os
-import sys
 import json
 import base64
 import re
@@ -283,7 +282,7 @@ function reconstructSelfHTML() {
 async function syncToGitHub() {
     const token = localStorage.getItem('GH_TOKEN');
     const owner = localStorage.getItem('GH_OWNER');
-    const repo = 'Tiktok-File'; // 硬编码仓库名
+    const repo = 'Tiktok-File';
     
     if(!token || !owner) { alert('缺少 GitHub Token，无法同步！'); return; }
 
@@ -411,7 +410,7 @@ def generate_index_template():
 <body>
     <div id="loadingBar"></div>
     <div class="manual-fetch-bar">
-        <input type="text" id="tiktokUrlInput" class="fetch-input" placeholder="粘贴 TikTok 链接，回车立即生成精读..." autocomplete="off">
+        <input type="text" id="tiktokUrlInput" class="fetch-input" placeholder="粘贴 TikTok 任意链接 (支持 vt.tiktok.com 短链)，回车抓取..." autocomplete="off">
         <button class="settings-btn" id="openSettingsBtn">⚙️</button>
     </div>
 
@@ -641,22 +640,52 @@ def generate_index_template():
             } catch(e) {}
         }
 
-        function extractTikTokVideoId(url) {
-            const trimmed = url.trim();
-            if (/^\d{15,22}$/.test(trimmed)) return trimmed;
-            const match = trimmed.match(/\/video\/(\d+)/);
+        // ================= 智能多通道短链还原引擎 =================
+        async function resolveTikTokVideoId(rawInput) {
+            let text = rawInput.trim();
+            
+            // 1. 如果是纯数字 ID (例如 7311302323228167429)
+            if (/^\d{15,22}$/.test(text)) return text;
+            
+            // 2. 如果是标准长链 (例如 /video/731130232...)
+            let match = text.match(/\/video\/(\d{15,22})/);
             if (match) return match[1];
-            const matchAlt = trimmed.match(/\b\d{18,21}\b/);
+
+            // 3. 如果是数字嵌入
+            let matchAlt = text.match(/\b\d{18,21}\b/);
             if (matchAlt) return matchAlt[0];
+
+            // 4. 如果是短链 (vt.tiktok.com 或 vm.tiktok.com)，启动跨域代理追查真实目标
+            if (text.includes('tiktok.com')) {
+                const proxyEndpoints = [
+                    `https://api.allorigins.win/raw?url=${encodeURIComponent(text)}`,
+                    `https://corsproxy.io/?${encodeURIComponent(text)}`
+                ];
+
+                for (let proxyUrl of proxyEndpoints) {
+                    try {
+                        const res = await fetch(proxyUrl);
+                        if (res.ok) {
+                            const html = await res.text();
+                            // 从重定向网页的 HTML 元数据提取真正的视频 ID
+                            const vidMatch = html.match(/\/video\/(\d{15,22})/) || html.match(/"id":"(\d{15,22})"/);
+                            if (vidMatch && vidMatch[1]) {
+                                return vidMatch[1];
+                            }
+                        }
+                    } catch (e) {
+                        console.warn("Proxy unshorten failed, trying next...", e);
+                    }
+                }
+            }
             return null;
         }
 
         document.getElementById('tiktokUrlInput').addEventListener('keypress', async function (e) {
             if (e.key === 'Enter') {
                 const url = this.value.trim();
-                const videoId = extractTikTokVideoId(url);
-                if (!videoId) return alert('❌ 无法识别的 TikTok 链接或缺少 Video ID (支持形如 /video/731130232... 或直接输入数字ID)');
-                
+                if (!url) return;
+
                 const rapidKey = localStorage.getItem('RAPIDAPI_KEY');
                 const rapidHost = localStorage.getItem('RAPIDAPI_HOST') || 'tiktok-api23.p.rapidapi.com';
                 const ghToken = localStorage.getItem('GH_TOKEN');
@@ -670,10 +699,17 @@ def generate_index_template():
                 }
 
                 const loadingBar = document.getElementById('loadingBar');
-                loadingBar.style.width = '10%'; this.disabled = true;
+                loadingBar.style.width = '15%'; 
+                this.disabled = true;
 
                 try {
-                    loadingBar.style.width = '30%';
+                    // 解析短链与提取 Video ID
+                    const videoId = await resolveTikTokVideoId(url);
+                    if (!videoId) {
+                        throw new Error("无法从该链接解析出有效 Video ID。如为短链，建议在浏览器打开后复制跳转后的完整链接重试！");
+                    }
+
+                    loadingBar.style.width = '35%';
                     let videoTitle = `TikTok Video ${videoId}`;
                     let videoChannel = "@TikTok Creator";
                     let videoCover = "https://p16-va.tiktokcdn.com/obj/tos-maliva-p-0068/default_cover.jpeg";
@@ -696,7 +732,7 @@ def generate_index_template():
                         }
                     } catch(err) {}
 
-                    loadingBar.style.width = '55%';
+                    loadingBar.style.width = '60%';
                     const cRes = await fetch(`https://${rapidHost}/api/post/comments?videoId=${videoId}&count=40&cursor=0`, {
                         headers: { 'x-rapidapi-host': rapidHost, 'x-rapidapi-key': rapidKey }
                     });
@@ -725,7 +761,7 @@ def generate_index_template():
                     comments.sort((a, b) => b.likes - a.likes);
                     comments = comments.slice(0, 35);
 
-                    loadingBar.style.width = '70%';
+                    loadingBar.style.width = '75%';
                     const videoObj = { title: videoTitle, channel: videoChannel, thumb: videoCover, url: videoUrl, id: videoId };
                     const htmlOutput = generateBaseHTMLString(videoObj, comments, AppState.year, AppState.month, AppState.day);
 
@@ -738,14 +774,14 @@ def generate_index_template():
                     const filename = `${yearStr}_${monthStr}_${dayStr}_${hhmmFile}_tiktok.html`;
                     const fileRelPath = `${yearStr}/${monthStr}/${filename}`;
 
-                    loadingBar.style.width = '80%';
+                    loadingBar.style.width = '85%';
                     await fetch(`https://api.github.com/repos/${ghOwner}/${ghRepo}/contents/docs/${fileRelPath}`, {
                         method: 'PUT',
                         headers: { 'Authorization': `token ${ghToken}`, 'Content-Type': 'application/json' },
                         body: JSON.stringify({ message: `Add tiktok video: ${videoTitle.substring(0, 30)}`, content: btoa(unescape(encodeURIComponent(htmlOutput))) })
                     });
 
-                    loadingBar.style.width = '90%';
+                    loadingBar.style.width = '95%';
                     const idxRes = await fetch(`https://api.github.com/repos/${ghOwner}/${ghRepo}/contents/docs/index.html`, { headers: { 'Authorization': `token ${ghToken}` } });
                     const idxData = await idxRes.json();
                     const idxContent = decodeURIComponent(escape(atob(idxData.content)));
@@ -879,7 +915,7 @@ def generate_index_template():
         .anno-toggle:hover, .ai-toggle:hover { opacity: 0.8; transform: scale(1.1); }
         .anno-toggle.has-anno { opacity: 1; }
         .ai-toggle.loading::after { content: "⏳"; display: inline-block; animation: spin 1s linear infinite; }
-        @keyframes spin { 100% { transform: rotate(360deg); } }
+        @keyframes spin {{ 100% { transform: rotate(360deg); } }}
         
         .anno-box { display: none; margin-top: 8px; width: 100%; box-sizing: border-box; background: #fff; border-left: 3px solid var(--accent); padding: 12px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
         .anno-view { font-size: 0.95rem; line-height: 1.5; color: #333; }
@@ -930,7 +966,7 @@ def generate_index_template():
     os.makedirs(BASE_DIR, exist_ok=True)
     with open(os.path.join(BASE_DIR, "index.html"), "w", encoding="utf-8") as f:
         f.write(html_template)
-    print("✅ `docs/index.html` 纯客户端日历枢纽构建完成！")
+    print("✅ `docs/index.html` 纯客户端日历枢纽构建完成（支持短链解析）！")
 
 if __name__ == "__main__":
     generate_index_template()
