@@ -128,6 +128,13 @@ function initAnnotations() {
                 e.preventDefault(); e.stopPropagation();
                 if (aiToggle.classList.contains('loading')) return;
 
+                // 批注覆盖确认保护机制
+                if (edit.value.trim() !== '') {
+                    if (!confirm('⚠️ 该评论已有批注，是否让 AI 重新生成并覆盖原内容？\n(点击取消则保留原批注)')) {
+                        return;
+                    }
+                }
+
                 const groqKey = localStorage.getItem('GROQ_API_KEY') || '';
                 const glmKey = localStorage.getItem('GLM_API_KEY') || '';
                 if (!groqKey && !glmKey) { alert('⚠️ 请先返回日历配置中心设置 AI API Key！'); return; }
@@ -269,7 +276,7 @@ function reconstructSelfHTML() {
             </div>
         </div>
         <div class="chat-container">
-            ${comments_html ? comments_html : '<div class="empty-state">暫無高價值評論。</div>'}
+            ${comments_html ? comments_html : '<div class="empty-state">暫無高价值评论。</div>'}
         </div>
     </div>
     <script id="page-data" type="application/json">${newJsonStr}<\/script>
@@ -353,7 +360,6 @@ def generate_index_template():
     json_data = json.dumps(archive_data)
     engine_b64 = base64.b64encode(ENGINE_SCRIPT.encode('utf-8')).decode('utf-8')
 
-    # 【修复重点】：增加 r 前缀将 html_template 声明为原始字符串，防止 JavaScript 中的 \b、\d 被错误转义！
     html_template = r"""<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -375,7 +381,9 @@ def generate_index_template():
         .modal-title { margin: 0 0 15px 0; font-size: 18px; font-weight: bold; }
         .form-group { margin-bottom: 15px; }
         .form-group label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 5px; font-weight: bold; }
-        .form-group input, .form-group select { width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; }
+        .form-group input, .form-group select { width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; background: #fff; color: #333; }
+        /* 强制修复 select 的下拉箭头和选中状态显示 */
+        .form-group select { -webkit-appearance: menulist; appearance: menulist; cursor: pointer; }
         .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
         .btn { padding: 8px 16px; border-radius: 8px; border: none; font-size: 14px; font-weight: bold; cursor: pointer; }
         .btn-cancel { background: #eee; color: #333; }
@@ -384,7 +392,7 @@ def generate_index_template():
         .controls { background: var(--bg); padding: 15px 20px; display: flex; justify-content: center; align-items: center; gap: 8px; border-bottom: 1px solid var(--border); }
         .control-btn { background: var(--primary); color: #fff; border: none; border-radius: 6px; padding: 8px 12px; font-size: 14px; cursor: pointer; font-weight: bold; transition: all 0.2s; }
         .control-btn:active { opacity: 0.8; transform: scale(0.95); }
-        .select-box { padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 15px; background: #fff; outline: none; font-weight: bold; cursor: pointer; }
+        .select-box { padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 15px; background: #fff; outline: none; font-weight: bold; cursor: pointer; color: #333;}
         .calendar-wrapper { background: var(--card); padding: 15px; margin-bottom: 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
         .weekdays { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-weight: bold; font-size: 13px; color: var(--muted); margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #f0f0f0; }
         .days-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
@@ -448,27 +456,20 @@ def generate_index_template():
         </div>
     </div>
 
-    <div class="container">
-        <div class="controls">
-            <button class="control-btn" id="prevBtn">&lt;</button>
-            <select class="select-box" id="yearSelect"></select>
-            <select class="select-box" id="monthSelect">
-                <option value="1">01月</option><option value="2">02月</option><option value="3">03月</option>
-                <option value="4">04月</option><option value="5">05月</option><option value="6">06月</option>
-                <option value="7">07月</option><option value="8">08月</option><option value="9">09月</option>
-                <option value="10">10月</option><option value="11">11月</option><option value="12">12月</option>
-            </select>
-            <button class="control-btn" id="nextBtn">&gt;</button>
-            <button class="control-btn" id="todayBtn">今天</button>
-        </div>
-        <div class="calendar-wrapper">
-            <div class="weekdays"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
-            <div class="days-grid" id="daysGrid"></div>
-        </div>
-        <div class="news-section"><div id="newsList"></div></div>
-    </div>
-
     <script>
+        // 优雅的全局 Toast 提示组件
+        function showToast(msg) {
+            const toast = document.createElement('div');
+            toast.textContent = msg;
+            toast.style.cssText = 'position:fixed; top:20px; left:50%; transform:translateX(-50%); background:#2ea44f; color:#fff; padding:10px 20px; border-radius:20px; font-size:14px; font-weight:bold; z-index:9999; box-shadow:0 4px 12px rgba(0,0,0,0.15); opacity:0; transition:opacity 0.3s; pointer-events:none;';
+            document.body.appendChild(toast);
+            setTimeout(() => toast.style.opacity = '1', 10);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 2000);
+        }
+
         const archiveData = /*DATA_START*/REPLACEME_JSON_DATA/*DATA_END*/;
         const today = new Date();
         const AppState = { year: today.getFullYear(), month: today.getMonth() + 1, day: today.getDate(), deleteMode: false };
@@ -577,11 +578,20 @@ def generate_index_template():
             document.getElementById('cfgRapidHost').value = localStorage.getItem('RAPIDAPI_HOST') || 'tiktok-api23.p.rapidapi.com';
             document.getElementById('cfgGhToken').value = localStorage.getItem('GH_TOKEN') || '';
             document.getElementById('cfgGhOwner').value = localStorage.getItem('GH_OWNER') || '';
-            document.getElementById('cfgPrefAI').value = localStorage.getItem('PREFERRED_AI') || 'groq';
             document.getElementById('cfgGroq').value = localStorage.getItem('GROQ_API_KEY') || '';
             document.getElementById('cfgGroqModel').value = localStorage.getItem('GROQ_MODEL') || 'llama-3.3-70b-versatile';
             document.getElementById('cfgGLM').value = localStorage.getItem('GLM_API_KEY') || '';
             document.getElementById('cfgGLMModel').value = localStorage.getItem('GLM_MODEL') || 'GLM-4.5-Flash';
+            
+            // 确保下拉框有默认选中，且不会显示空白
+            const savedAI = localStorage.getItem('PREFERRED_AI');
+            const selectEl = document.getElementById('cfgPrefAI');
+            if (savedAI === 'glm' || savedAI === 'groq') {
+                selectEl.value = savedAI;
+            } else {
+                selectEl.value = 'groq';
+            }
+            
             document.getElementById('settingsModal').style.display = 'flex';
         });
 
@@ -592,13 +602,18 @@ def generate_index_template():
             localStorage.setItem('RAPIDAPI_HOST', document.getElementById('cfgRapidHost').value.trim() || 'tiktok-api23.p.rapidapi.com');
             localStorage.setItem('GH_TOKEN', document.getElementById('cfgGhToken').value.trim());
             localStorage.setItem('GH_OWNER', document.getElementById('cfgGhOwner').value.trim());
-            localStorage.setItem('PREFERRED_AI', document.getElementById('cfgPrefAI').value);
+            
+            let prefAI = document.getElementById('cfgPrefAI').value;
+            localStorage.setItem('PREFERRED_AI', prefAI ? prefAI : 'groq');
+            
             localStorage.setItem('GROQ_API_KEY', document.getElementById('cfgGroq').value.trim());
             localStorage.setItem('GROQ_MODEL', document.getElementById('cfgGroqModel').value.trim());
             localStorage.setItem('GLM_API_KEY', document.getElementById('cfgGLM').value.trim());
             localStorage.setItem('GLM_MODEL', document.getElementById('cfgGLMModel').value.trim());
+            
             document.getElementById('settingsModal').style.display = 'none';
-            alert('✅ 配置已成功保存至本地浏览器！');
+            // 使用优雅的 Toast 提示代替 alert
+            showToast('✅ 配置已成功保存！');
         });
 
         async function syncDeleteToGithub(fileRelPath) {
@@ -870,7 +885,7 @@ def generate_index_template():
 
                     forceRender(); 
                     loadingBar.style.width = '100%';
-                    alert('🎉 抓取成功！TikTok 潮语精读单集已自动归档并同步至云端。');
+                    showToast('🎉 抓取成功并归档云端！');
                     this.value = '';
                     setTimeout(() => { loadingBar.style.width = '0%'; }, 1500);
                 } catch (err) {
@@ -1008,7 +1023,7 @@ def generate_index_template():
             </div>
         </div>
         <div class="chat-container">
-            ${comments_html ? comments_html : '<div class="empty-state">暫無高价值评论。</div>'}
+            ${comments_html ? comments_html : '<div class="empty-state">暫无高价值评论。</div>'}
         </div>
     </div>
     <script id="page-data" type="application/json">${pageDataStr}<` + `/script>
@@ -1026,7 +1041,7 @@ def generate_index_template():
     os.makedirs(BASE_DIR, exist_ok=True)
     with open(os.path.join(BASE_DIR, "index.html"), "w", encoding="utf-8") as f:
         f.write(html_template)
-    print("✅ `docs/index.html` 纯客户端日历枢纽已构建（已集成 5通道 极速短链解析引擎）！")
+    print("✅ `docs/index.html` 纯客户端日历枢纽已构建（加入了 AI 误触保护、下拉框修复和全局 Toast）！")
 
 if __name__ == "__main__":
     generate_index_template()
