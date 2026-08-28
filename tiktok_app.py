@@ -12,6 +12,7 @@ REPO_NAME = "Tiktok-File"
 tz_utc_8 = timezone(timedelta(hours=8))
 
 # ================= 批注核心引擎 (注入单集精读) =================
+# 注意：此处的 JS 代码被注入到每一天的 TikTok 精读详情页中
 ENGINE_SCRIPT = r"""
 function renderMarkdown(text) {
     if (typeof marked === 'undefined') return text;
@@ -27,7 +28,10 @@ function scheduleSync() {
     statusMsg.style.display = 'inline-block';
     statusMsg.style.backgroundColor = '#f39c12';
     statusMsg.innerText = '⏳ 更改已记录，5秒后自动同步...';
-    if (syncTimeout) clearTimeout(syncTimeout);
+    
+    if (syncTimeout) {
+        clearTimeout(syncTimeout);
+    }
     syncTimeout = setTimeout(syncToGitHub, 5000);
 }
 
@@ -52,8 +56,14 @@ async function fetchUniversalAI(text, apiUrl, apiKey, modelName) {
     const payload = {
         model: modelName,
         messages: [
-            { role: 'system', content: 'You are an expert English teacher specialized in Gen-Z slang and internet culture.' },
-            { role: 'user', content: AI_PROMPT + `"${text}"` }
+            { 
+                role: 'system', 
+                content: 'You are an expert English teacher specialized in Gen-Z slang and internet culture.' 
+            },
+            { 
+                role: 'user', 
+                content: AI_PROMPT + `"${text}"` 
+            }
         ],
         temperature: 0.3
     };
@@ -69,7 +79,10 @@ async function fetchUniversalAI(text, apiUrl, apiKey, modelName) {
     
     if (!res.ok) {
         let errDesc = '';
-        try { const errJson = await res.json(); errDesc = JSON.stringify(errJson); } catch(e) {}
+        try { 
+            const errJson = await res.json(); 
+            errDesc = JSON.stringify(errJson); 
+        } catch(e) {}
         throw new Error(`API Error ${res.status}: ${errDesc}`);
     }
     
@@ -77,7 +90,7 @@ async function fetchUniversalAI(text, apiUrl, apiKey, modelName) {
     if (json.choices && json.choices.length > 0 && json.choices[0].message) {
         return json.choices[0].message.content.trim();
     }
-    throw new Error('AI返回数据异常或格式不兼容，请确认该接口支持 OpenAI 标准格式。');
+    throw new Error('AI 返回数据异常或格式不兼容，请确认该接口支持 OpenAI 标准格式。');
 }
 
 async function executeAIPipeline(text) {
@@ -85,7 +98,9 @@ async function executeAIPipeline(text) {
     const apiKey = localStorage.getItem('CUSTOM_AI_KEY') || '';
     const modelName = localStorage.getItem('CUSTOM_AI_MODEL') || '';
 
-    if (!apiUrl || !apiKey || !modelName) throw new Error('MISSING_AI_CONFIG');
+    if (!apiUrl || !apiKey || !modelName) {
+        throw new Error('MISSING_AI_CONFIG');
+    }
 
     return await fetchUniversalAI(text, apiUrl, apiKey, modelName);
 }
@@ -99,11 +114,16 @@ function initAnnotations() {
         const box = wrap.querySelector('.anno-box');
 
         const rawText = edit.value.trim();
-        if (rawText) { toggle.classList.add('has-anno'); view.innerHTML = renderMarkdown(rawText); }
+        if (rawText) { 
+            toggle.classList.add('has-anno'); 
+            view.innerHTML = renderMarkdown(rawText); 
+        }
         
         if (aiToggle) {
             aiToggle.addEventListener('click', async (e) => {
-                e.preventDefault(); e.stopPropagation();
+                e.preventDefault(); 
+                e.stopPropagation();
+                
                 if (aiToggle.classList.contains('loading')) return;
 
                 if (edit.value.trim().length > 0) {
@@ -113,7 +133,10 @@ function initAnnotations() {
 
                 const aiUrl = localStorage.getItem('CUSTOM_AI_URL') || '';
                 const aiKey = localStorage.getItem('CUSTOM_AI_KEY') || '';
-                if (!aiUrl || !aiKey) { alert('⚠️ 请先返回日历配置中心设置 AI 接口地址和 API Key！'); return; }
+                if (!aiUrl || !aiKey) { 
+                    alert('⚠️ 请先返回日历配置中心设置 AI 接口地址和 API Key！'); 
+                    return; 
+                }
 
                 const pClone = wrap.querySelector('.card-text').cloneNode(true);
                 pClone.querySelectorAll('.anno-toggle, .ai-toggle').forEach(el => el.remove());
@@ -128,54 +151,96 @@ function initAnnotations() {
 
                 try {
                     const aiContent = await executeAIPipeline(pText);
-                    box.style.display = 'block'; view.style.display = 'none'; edit.style.display = 'block';
-                    edit.value = aiContent; edit.focus(); edit.blur();
-                    statusMsg.style.backgroundColor = '#2ea44f'; statusMsg.innerText = '✅ 解析成功';
-                    setTimeout(() => { if (statusMsg.innerText.includes('成功')) statusMsg.style.display = 'none'; }, 2000);
+                    box.style.display = 'block'; 
+                    view.style.display = 'none'; 
+                    edit.style.display = 'block';
+                    edit.value = aiContent; 
+                    edit.focus(); 
+                    edit.blur();
+                    
+                    statusMsg.style.backgroundColor = '#2ea44f'; 
+                    statusMsg.innerText = '✅ 解析成功';
+                    setTimeout(() => { 
+                        if (statusMsg.innerText.includes('成功')) {
+                            statusMsg.style.display = 'none'; 
+                        }
+                    }, 2000);
                 } catch (err) {
                     console.error(err);
-                    alert(err.message === 'MISSING_AI_CONFIG' ? '⚠️ 请返回配置 AI 接口和模型！' : '❌ AI 解析失败: ' + err.message);
+                    if (err.message === 'MISSING_AI_CONFIG') {
+                        alert('⚠️ 请返回配置 AI 接口和模型！');
+                    } else {
+                        alert('❌ AI 解析失败: ' + err.message);
+                    }
                     statusMsg.style.display = 'none';
-                } finally { aiToggle.classList.remove('loading'); }
+                } finally { 
+                    aiToggle.classList.remove('loading'); 
+                }
             });
         }
 
         toggle.addEventListener('click', (e) => {
-            e.preventDefault(); e.stopPropagation();
-            if (box.style.display === 'block') { box.style.display = 'none'; } 
-            else {
+            e.preventDefault(); 
+            e.stopPropagation();
+            if (box.style.display === 'block') { 
+                box.style.display = 'none'; 
+            } else {
                 box.style.display = 'block';
-                if (!edit.value.trim()) { view.style.display = 'none'; edit.style.display = 'block'; setTimeout(() => edit.focus(), 50); } 
-                else { view.style.display = 'block'; edit.style.display = 'none'; }
+                if (!edit.value.trim()) { 
+                    view.style.display = 'none'; 
+                    edit.style.display = 'block'; 
+                    setTimeout(() => edit.focus(), 50); 
+                } else { 
+                    view.style.display = 'block'; 
+                    edit.style.display = 'none'; 
+                }
             }
         });
 
-        const triggerEdit = () => { view.style.display = 'none'; edit.style.display = 'block'; edit.value = edit.value; setTimeout(() => edit.focus(), 50); };
+        const triggerEdit = () => { 
+            view.style.display = 'none'; 
+            edit.style.display = 'block'; 
+            edit.value = edit.value; 
+            setTimeout(() => edit.focus(), 50); 
+        };
         view.addEventListener('dblclick', () => { box.style.display = 'none'; });
 
         let lastTap = 0;
         view.addEventListener('touchstart', e => {
-            if (e.touches.length === 2) { triggerEdit(); } 
-            else if (e.touches.length === 1) {
+            if (e.touches.length === 2) { 
+                triggerEdit(); 
+            } else if (e.touches.length === 1) {
                 const currentTime = new Date().getTime();
                 const tapLength = currentTime - lastTap;
-                if (tapLength < 500 && tapLength > 0) { box.style.display = 'none'; }
+                if (tapLength < 500 && tapLength > 0) { 
+                    box.style.display = 'none'; 
+                }
                 lastTap = currentTime;
             }
         }, {passive: true});
 
         edit.addEventListener('blur', () => {
             const newVal = edit.value.trim();
-            try { view.innerHTML = newVal ? renderMarkdown(newVal) : ''; } catch(e){}
+            try { 
+                view.innerHTML = newVal ? renderMarkdown(newVal) : ''; 
+            } catch(e){}
+            
             edit.style.display = 'none';
-            if (newVal) { view.style.display = 'block'; toggle.classList.add('has-anno'); } 
-            else { view.style.display = 'none'; box.style.display = 'none'; toggle.classList.remove('has-anno'); }
+            if (newVal) { 
+                view.style.display = 'block'; 
+                toggle.classList.add('has-anno'); 
+            } else { 
+                view.style.display = 'none'; 
+                box.style.display = 'none'; 
+                toggle.classList.remove('has-anno'); 
+            }
 
             if (edit.getAttribute('data-old-val') !== newVal) {
                 edit.setAttribute('data-old-val', newVal);
                 scheduleSync();
             }
         });
+        
         edit.setAttribute('data-old-val', rawText);
     });
 }
@@ -183,12 +248,17 @@ window.onload = initAnnotations;
 
 function escapeHTML(str) {
     if (typeof str !== 'string') return '';
-    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+    return str.replace(/&/g, '&amp;')
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;')
+              .replace(/"/g, '&quot;')
+              .replace(/'/g, '&#039;');
 }
 
 function reconstructSelfHTML() {
     const dataTag = document.getElementById('page-data');
     if (!dataTag) throw new Error("Missing state data!");
+    
     const pageData = JSON.parse(dataTag.textContent);
     
     document.querySelectorAll('.chat-message').forEach((msg, idx) => {
@@ -267,7 +337,10 @@ async function syncToGitHub() {
     const owner = localStorage.getItem('GH_OWNER');
     const repo = 'Tiktok-File';
     
-    if(!token || !owner) { alert('缺少 GitHub Token，无法同步！'); return; }
+    if(!token || !owner) { 
+        alert('缺少 GitHub Token，无法同步！'); 
+        return; 
+    }
 
     const statusMsg = document.getElementById('sync-status');
     statusMsg.style.display = 'inline-block';
@@ -279,26 +352,58 @@ async function syncToGitHub() {
     const match = urlPath.match(/(\d{4}\/\d{1,2}\/[^/]+\.html)$/);
     let fileRelPath = match ? "docs/" + match[1] : (urlPath.includes('docs/') ? urlPath.substring(urlPath.indexOf('docs/')) : null);
     
-    if (!fileRelPath) { alert('路径解析失败！'); statusMsg.style.display = 'none'; return; }
+    if (!fileRelPath) { 
+        alert('路径解析失败！'); 
+        statusMsg.style.display = 'none'; 
+        return; 
+    }
 
     try {
-        const base64Html = btoa(encodeURIComponent(pureHtml).replace(/%([0-9A-F]{2})/g, function(match, p1) { return String.fromCharCode('0x' + p1); }));
-        const getRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${fileRelPath}?t=${Date.now()}`, { headers: { 'Authorization': `token ${token}` }, cache: 'no-store' });
+        const base64Html = btoa(encodeURIComponent(pureHtml).replace(/%([0-9A-F]{2})/g, function(match, p1) { 
+            return String.fromCharCode('0x' + p1); 
+        }));
+        
+        const getRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${fileRelPath}?t=${Date.now()}`, { 
+            headers: { 'Authorization': `token ${token}` }, 
+            cache: 'no-store' 
+        });
+        
         if (!getRes.ok) throw new Error('API 获取 SHA 失败');
+        
         const fileData = await getRes.json();
         const putRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${fileRelPath}`, {
             method: 'PUT',
-            headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: `Auto-save annotation`, content: base64Html, sha: fileData.sha })
+            headers: { 
+                'Authorization': `token ${token}`, 
+                'Content-Type': 'application/json' 
+            },
+            body: JSON.stringify({ 
+                message: `Auto-save annotation`, 
+                content: base64Html, 
+                sha: fileData.sha 
+            })
         });
+        
         if(putRes.ok) {
-            statusMsg.style.backgroundColor = '#2ea44f'; statusMsg.innerText = '✅ 云端已同步';
-            setTimeout(() => { if (statusMsg.innerText === '✅ 云端已同步') statusMsg.style.display = 'none'; }, 3000);
-        } else throw new Error('Put 请求失败');
+            statusMsg.style.backgroundColor = '#2ea44f'; 
+            statusMsg.innerText = '✅ 云端已同步';
+            setTimeout(() => { 
+                if (statusMsg.innerText === '✅ 云端已同步') {
+                    statusMsg.style.display = 'none'; 
+                }
+            }, 3000);
+        } else {
+            throw new Error('Put 请求失败');
+        }
     } catch(e) {
-        statusMsg.style.backgroundColor = '#e74c3c'; statusMsg.innerText = '❌ 同步失败(点击重试)';
+        statusMsg.style.backgroundColor = '#e74c3c'; 
+        statusMsg.innerText = '❌ 同步失败(点击重试)';
         statusMsg.style.cursor = 'pointer';
-        statusMsg.onclick = () => { statusMsg.onclick = null; statusMsg.style.cursor = 'default'; syncToGitHub(); };
+        statusMsg.onclick = () => { 
+            statusMsg.onclick = null; 
+            statusMsg.style.cursor = 'default'; 
+            syncToGitHub(); 
+        };
     }
 }
 """
@@ -511,7 +616,10 @@ def generate_index_template():
         }
 
         function saveConfigAndNotify(e) {
-            if (e) { e.preventDefault(); e.stopPropagation(); }
+            if (e) { 
+                e.preventDefault(); 
+                e.stopPropagation(); 
+            }
             try {
                 if (document.activeElement) document.activeElement.blur();
                 
@@ -543,10 +651,13 @@ def generate_index_template():
             const yearSelect = document.getElementById('yearSelect');
             yearSelect.innerHTML = '';
             const allYears = new Set(Object.keys(archiveData).map(Number));
-            for(let i = -5; i <= 50; i++) allYears.add(today.getFullYear() + i);
+            for(let i = -5; i <= 50; i++) {
+                allYears.add(today.getFullYear() + i);
+            }
             Array.from(allYears).sort((a, b) => b - a).forEach(y => { 
                 const opt = document.createElement('option'); 
-                opt.value = y; opt.textContent = y + ' 年'; 
+                opt.value = y; 
+                opt.textContent = y + ' 年'; 
                 yearSelect.appendChild(opt); 
             });
         }
@@ -560,7 +671,8 @@ def generate_index_template():
 
             const daysGrid = document.getElementById('daysGrid');
             const newsList = document.getElementById('newsList');
-            daysGrid.innerHTML = ''; newsList.innerHTML = '';
+            daysGrid.innerHTML = ''; 
+            newsList.innerHTML = '';
 
             try {
                 const firstDay = new Date(AppState.year, AppState.month - 1, 1).getDay() || 7;
@@ -573,14 +685,32 @@ def generate_index_template():
                 const monthData = (archiveData[AppState.year] && archiveData[AppState.year][AppState.month]) || {};
                 
                 for (let day = 1; day <= maxDay; day++) {
-                    const cell = document.createElement('div'); cell.className = 'day-cell'; cell.textContent = day;
-                    const dot = document.createElement('div'); dot.className = 'dot'; cell.appendChild(dot);
+                    const cell = document.createElement('div'); 
+                    cell.className = 'day-cell'; 
+                    cell.textContent = day;
                     
-                    if (monthData[day] && monthData[day].length > 0) cell.classList.add('has-news'); else cell.classList.add('no-news');
-                    if (AppState.year === today.getFullYear() && AppState.month === today.getMonth() + 1 && day === today.getDate()) cell.classList.add('today');
-                    if (day === AppState.day) cell.classList.add('selected');
+                    const dot = document.createElement('div'); 
+                    dot.className = 'dot'; 
+                    cell.appendChild(dot);
                     
-                    cell.onclick = () => { AppState.day = day; forceRender(); };
+                    if (monthData[day] && monthData[day].length > 0) {
+                        cell.classList.add('has-news'); 
+                    } else {
+                        cell.classList.add('no-news');
+                    }
+                    
+                    if (AppState.year === today.getFullYear() && AppState.month === today.getMonth() + 1 && day === today.getDate()) {
+                        cell.classList.add('today');
+                    }
+                    
+                    if (day === AppState.day) {
+                        cell.classList.add('selected');
+                    }
+                    
+                    cell.onclick = () => { 
+                        AppState.day = day; 
+                        forceRender(); 
+                    };
                     daysGrid.appendChild(cell);
                 }
             } catch (err) {}
@@ -593,12 +723,18 @@ def generate_index_template():
                 
                 if (dayData && Array.isArray(dayData) && dayData.length > 0) {
                     dayData.forEach((news, index) => {
-                        const wrapper = document.createElement('div'); wrapper.className = 'news-item-wrapper';
-                        const a = document.createElement('a'); a.href = news.path; a.className = 'news-item';
+                        const wrapper = document.createElement('div'); 
+                        wrapper.className = 'news-item-wrapper';
+                        
+                        const a = document.createElement('a'); 
+                        a.href = news.path; 
+                        a.className = 'news-item';
                         a.innerHTML = `<span class="news-title" style="color: var(--primary);">${news.title} (${news.time})</span>`;
                         wrapper.appendChild(a);
 
-                        const delBtn = document.createElement('button'); delBtn.className = 'delete-btn'; delBtn.innerHTML = '🗑️';
+                        const delBtn = document.createElement('button'); 
+                        delBtn.className = 'delete-btn'; 
+                        delBtn.innerHTML = '🗑️';
                         if (AppState.deleteMode) delBtn.style.display = 'block';
                         
                         delBtn.onclick = async (e) => {
@@ -606,12 +742,15 @@ def generate_index_template():
                             if(confirm('确认删除此条目并同步删除云端文件吗？')) {
                                 const pathToDelete = news.path; 
                                 dayData.splice(index, 1);
-                                if (dayData.length === 0) delete archiveData[AppState.year][AppState.month][AppState.day];
+                                if (dayData.length === 0) {
+                                    delete archiveData[AppState.year][AppState.month][AppState.day];
+                                }
                                 forceRender(); 
                                 await syncDeleteToGithub(pathToDelete);
                             }
                         };
-                        wrapper.appendChild(delBtn); newsList.appendChild(wrapper);
+                        wrapper.appendChild(delBtn); 
+                        newsList.appendChild(wrapper);
                     });
                 } else { 
                     newsList.innerHTML = '<div class="empty-state">当日暂无 TikTok 归档记录 👀</div>'; 
@@ -619,11 +758,36 @@ def generate_index_template():
             } catch (err) {}
         }
 
-        document.getElementById('yearSelect').addEventListener('change', (e) => { AppState.year = parseInt(e.target.value, 10); forceRender(); });
-        document.getElementById('monthSelect').addEventListener('change', (e) => { AppState.month = parseInt(e.target.value, 10); forceRender(); });
-        document.getElementById('prevBtn').addEventListener('click', () => { AppState.month--; if (AppState.month < 1) { AppState.month = 12; AppState.year--; } forceRender(); });
-        document.getElementById('nextBtn').addEventListener('click', () => { AppState.month++; if (AppState.month > 12) { AppState.month = 1; AppState.year++; } forceRender(); });
-        document.getElementById('todayBtn').addEventListener('click', () => { AppState.year = today.getFullYear(); AppState.month = today.getMonth() + 1; AppState.day = today.getDate(); forceRender(); });
+        document.getElementById('yearSelect').addEventListener('change', (e) => { 
+            AppState.year = parseInt(e.target.value, 10); 
+            forceRender(); 
+        });
+        document.getElementById('monthSelect').addEventListener('change', (e) => { 
+            AppState.month = parseInt(e.target.value, 10); 
+            forceRender(); 
+        });
+        document.getElementById('prevBtn').addEventListener('click', () => { 
+            AppState.month--; 
+            if (AppState.month < 1) { 
+                AppState.month = 12; 
+                AppState.year--; 
+            } 
+            forceRender(); 
+        });
+        document.getElementById('nextBtn').addEventListener('click', () => { 
+            AppState.month++; 
+            if (AppState.month > 12) { 
+                AppState.month = 1; 
+                AppState.year++; 
+            } 
+            forceRender(); 
+        });
+        document.getElementById('todayBtn').addEventListener('click', () => { 
+            AppState.year = today.getFullYear(); 
+            AppState.month = today.getMonth() + 1; 
+            AppState.day = today.getDate(); 
+            forceRender(); 
+        });
 
         let lastTap = 0;
         document.querySelector('.calendar-wrapper').addEventListener('click', (e) => {
@@ -636,7 +800,8 @@ def generate_index_template():
             lastTap = new Date().getTime();
         });
 
-        initSelects(); forceRender();
+        initSelects(); 
+        forceRender();
 
         async function syncDeleteToGithub(fileRelPath) {
             const ghToken = localStorage.getItem('GH_TOKEN');
@@ -644,69 +809,155 @@ def generate_index_template():
             const ghRepo = 'Tiktok-File';
             
             if (!ghToken || !ghOwner) return;
+            
             try {
-                const loadingBar = document.getElementById('loadingBar'); loadingBar.style.width = '10%';
+                const loadingBar = document.getElementById('loadingBar'); 
+                loadingBar.style.width = '10%';
+                
                 const targetFilePath = `docs/${fileRelPath}`;
-                const fileRes = await fetch(`https://api.github.com/repos/${ghOwner}/${ghRepo}/contents/${targetFilePath}`, { headers: { 'Authorization': `token ${ghToken}` } });
+                const fileRes = await fetch(`https://api.github.com/repos/${ghOwner}/${ghRepo}/contents/${targetFilePath}`, { 
+                    headers: { 'Authorization': `token ${ghToken}` } 
+                });
                 
                 if (fileRes.ok) {
                     const fileData = await fileRes.json();
                     await fetch(`https://api.github.com/repos/${ghOwner}/${ghRepo}/contents/${targetFilePath}`, {
                         method: 'DELETE',
-                        headers: { 'Authorization': `token ${ghToken}`, 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ message: `Delete archived tiktok file: ${fileRelPath}`, sha: fileData.sha })
+                        headers: { 
+                            'Authorization': `token ${ghToken}`, 
+                            'Content-Type': 'application/json' 
+                        },
+                        body: JSON.stringify({ 
+                            message: `Delete archived tiktok file: ${fileRelPath}`, 
+                            sha: fileData.sha 
+                        })
                     });
                 }
                 
                 loadingBar.style.width = '50%';
-                const idxRes = await fetch(`https://api.github.com/repos/${ghOwner}/${ghRepo}/contents/docs/index.html`, { headers: { 'Authorization': `token ${ghToken}` } });
+                
+                const idxRes = await fetch(`https://api.github.com/repos/${ghOwner}/${ghRepo}/contents/docs/index.html`, { 
+                    headers: { 'Authorization': `token ${ghToken}` } 
+                });
                 const idxData = await idxRes.json();
+                
                 const idxContent = decodeURIComponent(escape(atob(idxData.content)));
                 const dataStart = idxContent.indexOf('/*DATA_START*/') + 14;
                 const dataEnd = idxContent.indexOf('/*DATA_END*/');
+                
                 const newJsonStr = JSON.stringify(archiveData);
                 const newIdxContent = idxContent.substring(0, dataStart) + newJsonStr + idxContent.substring(dataEnd);
 
                 loadingBar.style.width = '80%';
                 await fetch(`https://api.github.com/repos/${ghOwner}/${ghRepo}/contents/docs/index.html`, {
                     method: 'PUT',
-                    headers: { 'Authorization': `token ${ghToken}`, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: `Update index.html after deleting file`, content: btoa(unescape(encodeURIComponent(newIdxContent))), sha: idxData.sha })
+                    headers: { 
+                        'Authorization': `token ${ghToken}`, 
+                        'Content-Type': 'application/json' 
+                    },
+                    body: JSON.stringify({ 
+                        message: `Update index.html after deleting file`, 
+                        content: btoa(unescape(encodeURIComponent(newIdxContent))), 
+                        sha: idxData.sha 
+                    })
                 });
                 
-                loadingBar.style.width = '100%'; setTimeout(() => { loadingBar.style.width = '0%'; }, 1000);
-            } catch(e) {}
+                loadingBar.style.width = '100%'; 
+                setTimeout(() => { loadingBar.style.width = '0%'; }, 1000);
+            } catch(e) {
+                console.error("Delete sync error:", e);
+            }
         }
 
         async function resolveTikTokVideoData(rawInput) {
             let text = rawInput.trim();
+            
+            // 纯数字 ID
             if (/^\d{15,22}$/.test(text)) return { id: text };
+            
+            // 完整视频链接中的 ID
             let match = text.match(/\/video\/(\d{15,22})/);
             if (match) return { id: match[1] };
+            
+            // 文本中混杂的数字 ID
             let matchAlt = text.match(/\b\d{15,22}\b/);
             if (matchAlt) return { id: matchAlt[0] };
+            
+            // 短链接解析通道
             if (text.includes('tiktok.com') || text.includes('douyin.com')) {
+                // 通道一：Lovetik
                 try {
-                    const formData = new URLSearchParams(); formData.append('query', text);
-                    const res = await fetch('https://lovetik.com/api/ajax/search', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: formData.toString() });
-                    if (res.ok) { const json = await res.json(); if (json && json.vid) return { id: String(json.vid), title: json.desc || '', channel: json.author ? '@' + json.author : '', thumb: json.cover || '' }; }
+                    const formData = new URLSearchParams(); 
+                    formData.append('query', text);
+                    const res = await fetch('https://lovetik.com/api/ajax/search', { 
+                        method: 'POST', 
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, 
+                        body: formData.toString() 
+                    });
+                    if (res.ok) { 
+                        const json = await res.json(); 
+                        if (json && json.vid) {
+                            return { 
+                                id: String(json.vid), 
+                                title: json.desc || '', 
+                                channel: json.author ? '@' + json.author : '', 
+                                thumb: json.cover || '' 
+                            };
+                        }
+                    }
                 } catch (e) {}
+                
+                // 通道二：TikWM
                 try {
                     const res = await fetch(`https://www.tikwm.com/api/?url=${encodeURIComponent(text)}`);
-                    if (res.ok) { const json = await res.json(); if (json && json.data && json.data.id) return { id: String(json.data.id), title: json.data.title || '', channel: json.data.author ? '@' + (json.data.author.nickname || json.data.author.unique_id) : '', thumb: json.data.cover || json.data.origin_cover || '' }; }
+                    if (res.ok) { 
+                        const json = await res.json(); 
+                        if (json && json.data && json.data.id) {
+                            return { 
+                                id: String(json.data.id), 
+                                title: json.data.title || '', 
+                                channel: json.data.author ? '@' + (json.data.author.nickname || json.data.author.unique_id) : '', 
+                                thumb: json.data.cover || json.data.origin_cover || '' 
+                            };
+                        }
+                    }
                 } catch (e) {}
+                
+                // 通道三：Codetabs 代理
                 try {
                     const res = await fetch(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(text)}`);
-                    if (res.ok) { const html = await res.text(); const m = html.match(/"aweme_id":"(\d{15,22})"/); if (m) return { id: m[1] }; }
+                    if (res.ok) { 
+                        const html = await res.text(); 
+                        const m = html.match(/"aweme_id":"(\d{15,22})"/); 
+                        if (m) return { id: m[1] }; 
+                    }
                 } catch (e) {}
+                
+                // 通道四：AllOrigins oEmbed
                 try {
                     const oembedUrl = `https://www.tiktok.com/oembed?url=${encodeURIComponent(text)}`;
                     const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(oembedUrl)}`);
-                    if (res.ok) { const json = await res.json(); if (json && json.contents) { const oData = JSON.parse(json.contents); let embedUrl = oData.embed_url || oData.html || ""; const m = embedUrl.match(/\/video\/(\d{15,22})/); if (m) return { id: m[1] }; } }
+                    if (res.ok) { 
+                        const json = await res.json(); 
+                        if (json && json.contents) { 
+                            const oData = JSON.parse(json.contents); 
+                            let embedUrl = oData.embed_url || oData.html || ""; 
+                            const m = embedUrl.match(/\/video\/(\d{15,22})/); 
+                            if (m) return { id: m[1] }; 
+                        } 
+                    }
                 } catch (e) {}
+                
+                // 通道五：Unshorten
                 try {
                     const res = await fetch(`https://unshorten.me/json/${encodeURIComponent(text)}`);
-                    if (res.ok) { const json = await res.json(); if (json && json.resolved_url) { const m = json.resolved_url.match(/\/video\/(\d{15,22})/); if (m) return { id: m[1] }; } }
+                    if (res.ok) { 
+                        const json = await res.json(); 
+                        if (json && json.resolved_url) { 
+                            const m = json.resolved_url.match(/\/video\/(\d{15,22})/); 
+                            if (m) return { id: m[1] }; 
+                        } 
+                    }
                 } catch (e) {}
             }
             return null;
@@ -747,9 +998,13 @@ def generate_index_template():
                     let videoCover = videoMeta.thumb || "https://p16-va.tiktokcdn.com/obj/tos-maliva-p-0068/default_cover.jpeg";
                     let videoUrl = `https://www.tiktok.com/video/${videoId}`;
 
+                    // 获取视频详细信息
                     try {
                         const vRes = await fetch(`https://${rapidHost}/api/post/detail?videoId=${videoId}`, {
-                            headers: { 'x-rapidapi-host': rapidHost, 'x-rapidapi-key': rapidKey }
+                            headers: { 
+                                'x-rapidapi-host': rapidHost, 
+                                'x-rapidapi-key': rapidKey 
+                            }
                         });
                         if (vRes.ok) {
                             const vData = await vRes.json();
@@ -765,10 +1020,19 @@ def generate_index_template():
                     } catch(err) {}
 
                     loadingBar.style.width = '60%';
+                    
+                    // 获取评论列表
                     const cRes = await fetch(`https://${rapidHost}/api/post/comments?videoId=${videoId}&count=40&cursor=0`, {
-                        headers: { 'x-rapidapi-host': rapidHost, 'x-rapidapi-key': rapidKey }
+                        headers: { 
+                            'x-rapidapi-host': rapidHost, 
+                            'x-rapidapi-key': rapidKey 
+                        }
                     });
-                    if (!cRes.ok) throw new Error(`RapidAPI 响应错误 (状态码: ${cRes.status})`);
+                    
+                    if (!cRes.ok) {
+                        throw new Error(`RapidAPI 响应错误 (状态码: ${cRes.status})`);
+                    }
+                    
                     const cData = await cRes.json();
                     const rawComments = (cData.data && cData.data.comments) || cData.comments || [];
                     
@@ -794,7 +1058,14 @@ def generate_index_template():
                     comments = comments.slice(0, 35);
 
                     loadingBar.style.width = '75%';
-                    const videoObj = { title: videoTitle, channel: videoChannel, thumb: videoCover, url: videoUrl, id: videoId };
+                    
+                    const videoObj = { 
+                        title: videoTitle, 
+                        channel: videoChannel, 
+                        thumb: videoCover, 
+                        url: videoUrl, 
+                        id: videoId 
+                    };
                     const htmlOutput = generateBaseHTMLString(videoObj, comments, AppState.year, AppState.month, AppState.day);
 
                     const now = new Date();
@@ -807,63 +1078,99 @@ def generate_index_template():
                     const fileRelPath = `${yearStr}/${monthStr}/${filename}`;
 
                     loadingBar.style.width = '85%';
+                    
+                    // 将生成的文件推送到 GitHub
                     await fetch(`https://api.github.com/repos/${ghOwner}/${ghRepo}/contents/docs/${fileRelPath}`, {
                         method: 'PUT',
-                        headers: { 'Authorization': `token ${ghToken}`, 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ message: `Add tiktok video: ${videoTitle.substring(0, 30)}`, content: btoa(unescape(encodeURIComponent(htmlOutput))) })
+                        headers: { 
+                            'Authorization': `token ${ghToken}`, 
+                            'Content-Type': 'application/json' 
+                        },
+                        body: JSON.stringify({ 
+                            message: `Add tiktok video: ${videoTitle.substring(0, 30)}`, 
+                            content: btoa(unescape(encodeURIComponent(htmlOutput))) 
+                        })
                     });
 
                     loadingBar.style.width = '95%';
-                    const idxRes = await fetch(`https://api.github.com/repos/${ghOwner}/${ghRepo}/contents/docs/index.html`, { headers: { 'Authorization': `token ${ghToken}` } });
+                    
+                    // 更新索引文件
+                    const idxRes = await fetch(`https://api.github.com/repos/${ghOwner}/${ghRepo}/contents/docs/index.html`, { 
+                        headers: { 'Authorization': `token ${ghToken}` } 
+                    });
                     const idxData = await idxRes.json();
+                    
                     const idxContent = decodeURIComponent(escape(atob(idxData.content)));
                     const dataStart = idxContent.indexOf('/*DATA_START*/') + 14;
                     const dataEnd = idxContent.indexOf('/*DATA_END*/');
+                    
                     const archiveObj = JSON.parse(idxContent.substring(dataStart, dataEnd));
 
                     if (!archiveObj[yearStr]) archiveObj[yearStr] = {};
                     if (!archiveObj[yearStr][monthStr]) archiveObj[yearStr][monthStr] = {};
                     if (!archiveObj[yearStr][monthStr][dayStr]) archiveObj[yearStr][monthStr][dayStr] = [];
                     
-                    const newItem = { time: hhmmStr, path: fileRelPath, title: `🎵 TikTok 单集精读: ${videoTitle}` };
+                    const newItem = { 
+                        time: hhmmStr, 
+                        path: fileRelPath, 
+                        title: `🎵 TikTok 单集精读: ${videoTitle}` 
+                    };
+                    
                     archiveObj[yearStr][monthStr][dayStr].unshift(newItem);
+                    
                     const newIdxContent = idxContent.substring(0, dataStart) + JSON.stringify(archiveObj) + idxContent.substring(dataEnd);
                     
                     await fetch(`https://api.github.com/repos/${ghOwner}/${ghRepo}/contents/docs/index.html`, {
                         method: 'PUT',
-                        headers: { 'Authorization': `token ${ghToken}`, 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ message: `Update calendar index`, content: btoa(unescape(encodeURIComponent(newIdxContent))), sha: idxData.sha })
+                        headers: { 
+                            'Authorization': `token ${ghToken}`, 
+                            'Content-Type': 'application/json' 
+                        },
+                        body: JSON.stringify({ 
+                            message: `Update calendar index`, 
+                            content: btoa(unescape(encodeURIComponent(newIdxContent))), 
+                            sha: idxData.sha 
+                        })
                     });
 
+                    // 本地状态更新
                     if (!archiveData[yearStr]) archiveData[yearStr] = {};
                     if (!archiveData[yearStr][monthStr]) archiveData[yearStr][monthStr] = {};
                     if (!archiveData[yearStr][monthStr][dayStr]) archiveData[yearStr][monthStr][dayStr] = [];
                     archiveData[yearStr][monthStr][dayStr].unshift(newItem);
 
                     forceRender(); 
+                    
                     loadingBar.style.width = '100%';
                     popToast('🎉 抓取并归档成功！', 1500);
                     this.value = '';
                     setTimeout(() => { loadingBar.style.width = '0%'; }, 1500);
+                    
                 } catch (err) {
                     alert('❌ 操作失败: ' + err.message); 
                     loadingBar.style.width = '0%';
-                } finally { this.disabled = false; }
+                } finally { 
+                    this.disabled = false; 
+                }
             }
         });
 
         // ================= 数据驱动防污染生成器 =================
         const ENGINE_B64 = 'REPLACEME_ENGINE_B64';
+        
         function b64DecodeUnicode(str) {
             return decodeURIComponent(atob(str).split('').map(function(c) {
                 return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
             }).join(''));
         }
+        
         const engineScriptContent = b64DecodeUnicode(ENGINE_B64);
 
         function generateBaseHTMLString(video, comments, sYear, sMonth, sDay) {
             const pageData = {
-                year: sYear, month: sMonth, day: sDay,
+                year: sYear, 
+                month: sMonth, 
+                day: sDay,
                 video: {
                     title: video.title,
                     channel: video.channel,
@@ -884,7 +1191,11 @@ def generate_index_template():
 
             function escapeHTML(str) {
                 if (typeof str !== 'string') return '';
-                return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+                return str.replace(/&/g, '&amp;')
+                          .replace(/</g, '&lt;')
+                          .replace(/>/g, '&gt;')
+                          .replace(/"/g, '&quot;')
+                          .replace(/'/g, '&#039;');
             }
 
             let comments_html = "";
@@ -998,7 +1309,7 @@ def generate_index_template():
     os.makedirs(BASE_DIR, exist_ok=True)
     with open(os.path.join(BASE_DIR, "index.html"), "w", encoding="utf-8") as f:
         f.write(html_template)
-    print("✅ `docs/index.html` 纯客户端日历枢纽构建完成（通用全系 AI 接口适配版已就绪）！")
+    print("✅ `docs/index.html` 纯客户端日历枢纽构建完成（通用全系 AI 接口适配，无压缩完整版）！")
 
 if __name__ == "__main__":
     generate_index_template()
