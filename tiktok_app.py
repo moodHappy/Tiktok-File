@@ -12,7 +12,6 @@ REPO_NAME = "Tiktok-File"
 tz_utc_8 = timezone(timedelta(hours=8))
 
 # ================= 批注核心引擎 (注入单集精读) =================
-# 注意：此处的 JS 代码被注入到每一天的 TikTok 精读详情页中
 ENGINE_SCRIPT = r"""
 function renderMarkdown(text) {
     if (typeof marked === 'undefined') return text;
@@ -28,10 +27,7 @@ function scheduleSync() {
     statusMsg.style.display = 'inline-block';
     statusMsg.style.backgroundColor = '#f39c12';
     statusMsg.innerText = '⏳ 更改已记录，5秒后自动同步...';
-    
-    if (syncTimeout) {
-        clearTimeout(syncTimeout);
-    }
+    if (syncTimeout) clearTimeout(syncTimeout);
     syncTimeout = setTimeout(syncToGitHub, 5000);
 }
 
@@ -51,58 +47,108 @@ const AI_PROMPT = `你是一位精通美国年轻一代流行语、TikTok 梗文
 评论内容：
 `;
 
-// 通用 AI 请求引擎 (支持所有 OpenAI 格式兼容的 API)
-async function fetchUniversalAI(text, apiUrl, apiKey, modelName) {
-    const payload = {
-        model: modelName,
-        messages: [
-            { 
-                role: 'system', 
-                content: 'You are an expert English teacher specialized in Gen-Z slang and internet culture.' 
-            },
-            { 
-                role: 'user', 
-                content: AI_PROMPT + `"${text}"` 
-            }
-        ],
-        temperature: 0.3
-    };
-
-    const res = await fetch(apiUrl, {
+async function fetchCustom(text, url, apiKey, modelName) {
+    const res = await fetch(url, {
         method: 'POST',
-        headers: { 
-            'Authorization': `Bearer ${apiKey}`, 
-            'Content-Type': 'application/json' 
-        },
-        body: JSON.stringify(payload)
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            model: modelName,
+            messages: [
+                { role: 'system', content: 'You are an expert English teacher specialized in Gen-Z slang and internet culture.' },
+                { role: 'user', content: AI_PROMPT + `"${text}"` }
+            ],
+            temperature: 0.3
+        })
     });
-    
-    if (!res.ok) {
-        let errDesc = '';
-        try { 
-            const errJson = await res.json(); 
-            errDesc = JSON.stringify(errJson); 
-        } catch(e) {}
-        throw new Error(`API Error ${res.status}: ${errDesc}`);
-    }
-    
+    if (!res.ok) throw new Error(`自定义API Error: ${res.status}`);
     const json = await res.json();
-    if (json.choices && json.choices.length > 0 && json.choices[0].message) {
-        return json.choices[0].message.content.trim();
-    }
-    throw new Error('AI 返回数据异常或格式不兼容，请确认该接口支持 OpenAI 标准格式。');
+    if (json.choices && json.choices.length > 0) return json.choices[0].message.content.trim();
+    throw new Error('自定义API返回数据异常');
+}
+
+async function fetchGroq(text, apiKey, modelName) {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            model: modelName,
+            messages: [
+                { role: 'system', content: 'You are an expert English teacher specialized in Gen-Z slang and internet culture.' },
+                { role: 'user', content: AI_PROMPT + `"${text}"` }
+            ],
+            temperature: 0.3
+        })
+    });
+    if (!res.ok) throw new Error(`Groq API Error: ${res.status}`);
+    const json = await res.json();
+    if (json.choices && json.choices.length > 0) return json.choices[0].message.content.trim();
+    throw new Error('Groq返回数据异常');
+}
+
+async function fetchGLM(text, apiKey, modelName) {
+    const res = await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            model: modelName,
+            messages: [
+                { role: 'system', content: 'You are an expert English teacher specialized in Gen-Z slang and internet culture.' },
+                { role: 'user', content: AI_PROMPT + `"${text}"` }
+            ],
+            temperature: 0.3
+        })
+    });
+    if (!res.ok) throw new Error(`智谱GLM API Error: ${res.status}`);
+    const json = await res.json();
+    if (json.choices && json.choices.length > 0) return json.choices[0].message.content.trim();
+    throw new Error('智谱GLM返回数据异常');
 }
 
 async function executeAIPipeline(text) {
-    const apiUrl = localStorage.getItem('CUSTOM_AI_URL') || '';
-    const apiKey = localStorage.getItem('CUSTOM_AI_KEY') || '';
-    const modelName = localStorage.getItem('CUSTOM_AI_MODEL') || '';
+    const pref = localStorage.getItem('PREFERRED_AI') || 'groq';
+    const groqKey = localStorage.getItem('GROQ_API_KEY') || '';
+    const glmKey = localStorage.getItem('GLM_API_KEY') || '';
+    const groqModel = localStorage.getItem('GROQ_MODEL') || 'llama-3.3-70b-versatile';
+    const glmModel = localStorage.getItem('GLM_MODEL') || 'GLM-4.5-Flash';
+    
+    const customUrl = localStorage.getItem('CUSTOM_API_URL') || '';
+    const customKey = localStorage.getItem('CUSTOM_API_KEY') || '';
+    const customModel = localStorage.getItem('CUSTOM_MODEL') || '';
 
-    if (!apiUrl || !apiKey || !modelName) {
-        throw new Error('MISSING_AI_CONFIG');
+    if ((!groqKey && !glmKey && !customKey) || (!groqModel && !glmModel && !customModel)) throw new Error('MISSING_KEYS_OR_MODELS');
+
+    const runGroq = async () => { if (!groqKey || !groqModel) throw new Error("Groq 配置缺失"); return await fetchGroq(text, groqKey, groqModel); };
+    const runGLM = async () => { if (!glmKey || !glmModel) throw new Error("智谱GLM 配置缺失"); return await fetchGLM(text, glmKey, glmModel); };
+    const runCustom = async () => { if (!customUrl || !customKey || !customModel) throw new Error("自定义配置缺失"); return await fetchCustom(text, customUrl, customKey, customModel); };
+
+    if (pref === 'custom') {
+        try { return await runCustom(); } catch (err) {
+            console.warn("自定义 AI 失败，尝试降级到 Groq:", err);
+            if (groqKey && groqModel) { 
+                document.getElementById('sync-status').innerText = '⚠️ 降级为Groq...'; 
+                try { return await runGroq(); } catch (err2) {
+                    console.warn("Groq 也失败，降级到智谱:", err2);
+                    if (glmKey && glmModel) { document.getElementById('sync-status').innerText = '⚠️ 降级为智谱...'; return await runGLM(); }
+                    throw err2;
+                }
+            } else if (glmKey && glmModel) { 
+                document.getElementById('sync-status').innerText = '⚠️ 降级为智谱...'; return await runGLM(); 
+            }
+            throw err;
+        }
+    } else if (pref === 'groq') {
+        try { return await runGroq(); } catch (err) {
+            console.warn("Groq 失败，降级到智谱:", err);
+            if (glmKey && glmModel) { document.getElementById('sync-status').innerText = '⚠️ 降级为智谱...'; return await runGLM(); }
+            throw err;
+        }
+    } else {
+        try { return await runGLM(); } catch (err) {
+            console.warn("智谱 失败，降级到Groq:", err);
+            if (groqKey && groqModel) { document.getElementById('sync-status').innerText = '⚠️ 降级为Groq...'; return await runGroq(); }
+            throw err;
+        }
     }
-
-    return await fetchUniversalAI(text, apiUrl, apiKey, modelName);
 }
 
 function initAnnotations() {
@@ -114,29 +160,23 @@ function initAnnotations() {
         const box = wrap.querySelector('.anno-box');
 
         const rawText = edit.value.trim();
-        if (rawText) { 
-            toggle.classList.add('has-anno'); 
-            view.innerHTML = renderMarkdown(rawText); 
-        }
+        if (rawText) { toggle.classList.add('has-anno'); view.innerHTML = renderMarkdown(rawText); }
         
         if (aiToggle) {
             aiToggle.addEventListener('click', async (e) => {
-                e.preventDefault(); 
-                e.stopPropagation();
-                
+                e.preventDefault(); e.stopPropagation();
                 if (aiToggle.classList.contains('loading')) return;
 
+                // 【防误触/防浪费确认】：已有内容时必须确认才覆盖
                 if (edit.value.trim().length > 0) {
                     const confirmOverwrite = confirm('⚠️ 当前已有批注内容，是否重新生成并覆盖？');
                     if (!confirmOverwrite) return;
                 }
 
-                const aiUrl = localStorage.getItem('CUSTOM_AI_URL') || '';
-                const aiKey = localStorage.getItem('CUSTOM_AI_KEY') || '';
-                if (!aiUrl || !aiKey) { 
-                    alert('⚠️ 请先返回日历配置中心设置 AI 接口地址和 API Key！'); 
-                    return; 
-                }
+                const groqKey = localStorage.getItem('GROQ_API_KEY') || '';
+                const glmKey = localStorage.getItem('GLM_API_KEY') || '';
+                const customKey = localStorage.getItem('CUSTOM_API_KEY') || '';
+                if (!groqKey && !glmKey && !customKey) { alert('⚠️ 请先返回日历配置中心设置 AI API Key！'); return; }
 
                 const pClone = wrap.querySelector('.card-text').cloneNode(true);
                 pClone.querySelectorAll('.anno-toggle, .ai-toggle').forEach(el => el.remove());
@@ -151,96 +191,54 @@ function initAnnotations() {
 
                 try {
                     const aiContent = await executeAIPipeline(pText);
-                    box.style.display = 'block'; 
-                    view.style.display = 'none'; 
-                    edit.style.display = 'block';
-                    edit.value = aiContent; 
-                    edit.focus(); 
-                    edit.blur();
-                    
-                    statusMsg.style.backgroundColor = '#2ea44f'; 
-                    statusMsg.innerText = '✅ 解析成功';
-                    setTimeout(() => { 
-                        if (statusMsg.innerText.includes('成功')) {
-                            statusMsg.style.display = 'none'; 
-                        }
-                    }, 2000);
+                    box.style.display = 'block'; view.style.display = 'none'; edit.style.display = 'block';
+                    edit.value = aiContent; edit.focus(); edit.blur();
+                    statusMsg.style.backgroundColor = '#2ea44f'; statusMsg.innerText = '✅ 解析成功';
+                    setTimeout(() => { if (statusMsg.innerText.includes('成功')) statusMsg.style.display = 'none'; }, 2000);
                 } catch (err) {
                     console.error(err);
-                    if (err.message === 'MISSING_AI_CONFIG') {
-                        alert('⚠️ 请返回配置 AI 接口和模型！');
-                    } else {
-                        alert('❌ AI 解析失败: ' + err.message);
-                    }
+                    alert(err.message === 'MISSING_KEYS_OR_MODELS' ? '⚠️ 请返回配置AI密钥和模型！' : '❌ AI 解析失败: ' + err.message);
                     statusMsg.style.display = 'none';
-                } finally { 
-                    aiToggle.classList.remove('loading'); 
-                }
+                } finally { aiToggle.classList.remove('loading'); }
             });
         }
 
         toggle.addEventListener('click', (e) => {
-            e.preventDefault(); 
-            e.stopPropagation();
-            if (box.style.display === 'block') { 
-                box.style.display = 'none'; 
-            } else {
+            e.preventDefault(); e.stopPropagation();
+            if (box.style.display === 'block') { box.style.display = 'none'; } 
+            else {
                 box.style.display = 'block';
-                if (!edit.value.trim()) { 
-                    view.style.display = 'none'; 
-                    edit.style.display = 'block'; 
-                    setTimeout(() => edit.focus(), 50); 
-                } else { 
-                    view.style.display = 'block'; 
-                    edit.style.display = 'none'; 
-                }
+                if (!edit.value.trim()) { view.style.display = 'none'; edit.style.display = 'block'; setTimeout(() => edit.focus(), 50); } 
+                else { view.style.display = 'block'; edit.style.display = 'none'; }
             }
         });
 
-        const triggerEdit = () => { 
-            view.style.display = 'none'; 
-            edit.style.display = 'block'; 
-            edit.value = edit.value; 
-            setTimeout(() => edit.focus(), 50); 
-        };
+        const triggerEdit = () => { view.style.display = 'none'; edit.style.display = 'block'; edit.value = edit.value; setTimeout(() => edit.focus(), 50); };
         view.addEventListener('dblclick', () => { box.style.display = 'none'; });
 
         let lastTap = 0;
         view.addEventListener('touchstart', e => {
-            if (e.touches.length === 2) { 
-                triggerEdit(); 
-            } else if (e.touches.length === 1) {
+            if (e.touches.length === 2) { triggerEdit(); } 
+            else if (e.touches.length === 1) {
                 const currentTime = new Date().getTime();
                 const tapLength = currentTime - lastTap;
-                if (tapLength < 500 && tapLength > 0) { 
-                    box.style.display = 'none'; 
-                }
+                if (tapLength < 500 && tapLength > 0) { box.style.display = 'none'; }
                 lastTap = currentTime;
             }
         }, {passive: true});
 
         edit.addEventListener('blur', () => {
             const newVal = edit.value.trim();
-            try { 
-                view.innerHTML = newVal ? renderMarkdown(newVal) : ''; 
-            } catch(e){}
-            
+            try { view.innerHTML = newVal ? renderMarkdown(newVal) : ''; } catch(e){}
             edit.style.display = 'none';
-            if (newVal) { 
-                view.style.display = 'block'; 
-                toggle.classList.add('has-anno'); 
-            } else { 
-                view.style.display = 'none'; 
-                box.style.display = 'none'; 
-                toggle.classList.remove('has-anno'); 
-            }
+            if (newVal) { view.style.display = 'block'; toggle.classList.add('has-anno'); } 
+            else { view.style.display = 'none'; box.style.display = 'none'; toggle.classList.remove('has-anno'); }
 
             if (edit.getAttribute('data-old-val') !== newVal) {
                 edit.setAttribute('data-old-val', newVal);
                 scheduleSync();
             }
         });
-        
         edit.setAttribute('data-old-val', rawText);
     });
 }
@@ -248,17 +246,12 @@ window.onload = initAnnotations;
 
 function escapeHTML(str) {
     if (typeof str !== 'string') return '';
-    return str.replace(/&/g, '&amp;')
-              .replace(/</g, '&lt;')
-              .replace(/>/g, '&gt;')
-              .replace(/"/g, '&quot;')
-              .replace(/'/g, '&#039;');
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 }
 
 function reconstructSelfHTML() {
     const dataTag = document.getElementById('page-data');
     if (!dataTag) throw new Error("Missing state data!");
-    
     const pageData = JSON.parse(dataTag.textContent);
     
     document.querySelectorAll('.chat-message').forEach((msg, idx) => {
@@ -337,10 +330,7 @@ async function syncToGitHub() {
     const owner = localStorage.getItem('GH_OWNER');
     const repo = 'Tiktok-File';
     
-    if(!token || !owner) { 
-        alert('缺少 GitHub Token，无法同步！'); 
-        return; 
-    }
+    if(!token || !owner) { alert('缺少 GitHub Token，无法同步！'); return; }
 
     const statusMsg = document.getElementById('sync-status');
     statusMsg.style.display = 'inline-block';
@@ -352,58 +342,26 @@ async function syncToGitHub() {
     const match = urlPath.match(/(\d{4}\/\d{1,2}\/[^/]+\.html)$/);
     let fileRelPath = match ? "docs/" + match[1] : (urlPath.includes('docs/') ? urlPath.substring(urlPath.indexOf('docs/')) : null);
     
-    if (!fileRelPath) { 
-        alert('路径解析失败！'); 
-        statusMsg.style.display = 'none'; 
-        return; 
-    }
+    if (!fileRelPath) { alert('路径解析失败！'); statusMsg.style.display = 'none'; return; }
 
     try {
-        const base64Html = btoa(encodeURIComponent(pureHtml).replace(/%([0-9A-F]{2})/g, function(match, p1) { 
-            return String.fromCharCode('0x' + p1); 
-        }));
-        
-        const getRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${fileRelPath}?t=${Date.now()}`, { 
-            headers: { 'Authorization': `token ${token}` }, 
-            cache: 'no-store' 
-        });
-        
+        const base64Html = btoa(encodeURIComponent(pureHtml).replace(/%([0-9A-F]{2})/g, function(match, p1) { return String.fromCharCode('0x' + p1); }));
+        const getRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${fileRelPath}?t=${Date.now()}`, { headers: { 'Authorization': `token ${token}` }, cache: 'no-store' });
         if (!getRes.ok) throw new Error('API 获取 SHA 失败');
-        
         const fileData = await getRes.json();
         const putRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${fileRelPath}`, {
             method: 'PUT',
-            headers: { 
-                'Authorization': `token ${token}`, 
-                'Content-Type': 'application/json' 
-            },
-            body: JSON.stringify({ 
-                message: `Auto-save annotation`, 
-                content: base64Html, 
-                sha: fileData.sha 
-            })
+            headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: `Auto-save annotation`, content: base64Html, sha: fileData.sha })
         });
-        
         if(putRes.ok) {
-            statusMsg.style.backgroundColor = '#2ea44f'; 
-            statusMsg.innerText = '✅ 云端已同步';
-            setTimeout(() => { 
-                if (statusMsg.innerText === '✅ 云端已同步') {
-                    statusMsg.style.display = 'none'; 
-                }
-            }, 3000);
-        } else {
-            throw new Error('Put 请求失败');
-        }
+            statusMsg.style.backgroundColor = '#2ea44f'; statusMsg.innerText = '✅ 云端已同步';
+            setTimeout(() => { if (statusMsg.innerText === '✅ 云端已同步') statusMsg.style.display = 'none'; }, 3000);
+        } else throw new Error('Put 请求失败');
     } catch(e) {
-        statusMsg.style.backgroundColor = '#e74c3c'; 
-        statusMsg.innerText = '❌ 同步失败(点击重试)';
+        statusMsg.style.backgroundColor = '#e74c3c'; statusMsg.innerText = '❌ 同步失败(点击重试)';
         statusMsg.style.cursor = 'pointer';
-        statusMsg.onclick = () => { 
-            statusMsg.onclick = null; 
-            statusMsg.style.cursor = 'default'; 
-            syncToGitHub(); 
-        };
+        statusMsg.onclick = () => { statusMsg.onclick = null; statusMsg.style.cursor = 'default'; syncToGitHub(); };
     }
 }
 """
@@ -463,7 +421,6 @@ def generate_index_template():
         .form-group { margin-bottom: 15px; }
         .form-group label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 5px; font-weight: bold; }
         .form-group input { width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; background: #fff; color: #333; }
-        .form-group p.help-text { font-size: 11px; color: #999; margin: 4px 0 0 0; line-height: 1.3; }
         
         /* 移动端高兼容下拉框样式 */
         .form-group select {
@@ -506,7 +463,7 @@ def generate_index_template():
         .empty-state { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 14px; background: var(--card); border-radius: 14px; }
         #loadingBar { height: 3px; background: var(--primary); width: 0%; transition: width 0.3s; position: absolute; top: 0; left: 0; z-index: 30; }
 
-        /* 全局居中模态卡片提示 */
+        /* 全局居中模态卡片提示 (z-index 设为最高 99999) */
         .toast-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.45); z-index: 99999; justify-content: center; align-items: center; }
         .toast-card { background: #ffffff; border-radius: 18px; padding: 25px 30px; text-align: center; box-shadow: 0 12px 30px rgba(0,0,0,0.2); max-width: 280px; width: 75%; animation: toastScale 0.2s ease-out; }
         .toast-icon { font-size: 40px; margin-bottom: 8px; line-height: 1; }
@@ -517,6 +474,7 @@ def generate_index_template():
 <body>
     <div id="loadingBar"></div>
 
+    <!-- 居中自动关闭卡片 -->
     <div class="toast-overlay" id="toastOverlay">
         <div class="toast-card">
             <div class="toast-icon">✅</div>
@@ -532,7 +490,7 @@ def generate_index_template():
     <div class="modal-overlay" id="settingsModal">
         <div class="modal-content">
             <h3 class="modal-title">本地配置中心</h3>
-            <p style="font-size:12px; color:#888; margin-top:-10px; margin-bottom:15px;">所有密钥仅保存在本地浏览器缓存中。</p>
+            <p style="font-size:12px; color:#888; margin-top:-10px; margin-bottom:15px;">密钥保存在本地浏览器中，绝不会硬编码泄露在仓库代码中。</p>
             
             <div class="form-group"><label>RapidAPI Key (TikTok 数据源)</label><input type="password" id="cfgRapidKey" placeholder="例如 a52da3c..."></div>
             <div class="form-group"><label>RapidAPI Host (默认 tiktok-api23)</label><input type="text" id="cfgRapidHost" placeholder="tiktok-api23.p.rapidapi.com"></div>
@@ -544,16 +502,35 @@ def generate_index_template():
                 <div style="flex:1;"><label>仓库 (写死)</label><input type="text" value="Tiktok-File" readonly disabled style="background:#eee; color:#888;"></div>
             </div>
 
-            <!-- 通用 AI 接口配置区 -->
             <div style="border-top:1px dashed #ddd; margin: 15px 0;"></div>
             <div class="form-group">
-                <label>🌐 通用 AI 接口地址 (API URL)</label>
-                <input type="text" id="cfgAiUrl" placeholder="如: https://api.chatanywhere.tech/v1/chat/completions">
-                <p class="help-text">需精确到 <code>/v1/chat/completions</code>。<br/>支持任何兼容 OpenAI 格式的 API (如 DeepSeek, 豆包, Kimi, Qwen, ChatAnywhere, Groq 等)。</p>
+                <label>首选 AI 引擎 (批注助手)</label>
+                <select id="cfgPrefAI">
+                    <option value="groq">Groq</option>
+                    <option value="glm">智谱</option>
+                    <option value="custom">自定义 (支持兼容OpenAI协议的所有AI)</option>
+                </select>
+            </div>
+            
+            <!-- 自定义AI 专属配置块 -->
+            <div class="form-group">
+                <label>自定义 API URL (需完整包含 /v1/chat/completions)</label>
+                <input type="text" id="cfgCustomURL" placeholder="https://api.chatanywhere.tech/v1/chat/completions">
             </div>
             <div class="form-group" style="display:flex; gap:10px;">
-                <div style="flex:1;"><label>🔑 API Key (密钥)</label><input type="password" id="cfgAiKey" placeholder="sk-..."></div>
-                <div style="flex:1;"><label>🧠 模型名称</label><input type="text" id="cfgAiModel" placeholder="gpt-3.5-turbo / deepseek-chat"></div>
+                <div style="flex:1;"><label>自定义 Key</label><input type="password" id="cfgCustomKey" placeholder="sk-..."></div>
+                <div style="flex:1;"><label>自定义 模型</label><input type="text" id="cfgCustomModel" placeholder="gpt-3.5-turbo / deepseek-chat"></div>
+            </div>
+            <div style="border-top:1px dashed #ddd; margin: 15px 0;"></div>
+            <!-- /自定义AI 专属配置块结束 -->
+
+            <div class="form-group" style="display:flex; gap:10px;">
+                <div style="flex:1;"><label>Groq Key</label><input type="password" id="cfgGroq" placeholder="gsk_..."></div>
+                <div style="flex:1;"><label>Groq 模型</label><input type="text" id="cfgGroqModel" placeholder="llama-3.3-70b-versatile"></div>
+            </div>
+            <div class="form-group" style="display:flex; gap:10px;">
+                <div style="flex:1;"><label>智谱 Key</label><input type="password" id="cfgGLM" placeholder="..."></div>
+                <div style="flex:1;"><label>智谱 模型</label><input type="text" id="cfgGLMModel" placeholder="GLM-4.5-Flash"></div>
             </div>
             
             <div class="modal-actions">
@@ -588,6 +565,7 @@ def generate_index_template():
         const today = new Date();
         const AppState = { year: today.getFullYear(), month: today.getMonth() + 1, day: today.getDate(), deleteMode: false };
 
+        // 弹窗提示并在指定时间后自动淡出消失
         function popToast(msg, duration = 1200) {
             const overlay = document.getElementById('toastOverlay');
             document.getElementById('toastText').innerText = msg;
@@ -603,11 +581,17 @@ def generate_index_template():
             document.getElementById('cfgGhToken').value = localStorage.getItem('GH_TOKEN') || '';
             document.getElementById('cfgGhOwner').value = localStorage.getItem('GH_OWNER') || '';
             
-            // 读取通用 AI 配置
-            document.getElementById('cfgAiUrl').value = localStorage.getItem('CUSTOM_AI_URL') || '';
-            document.getElementById('cfgAiKey').value = localStorage.getItem('CUSTOM_AI_KEY') || '';
-            document.getElementById('cfgAiModel').value = localStorage.getItem('CUSTOM_AI_MODEL') || '';
+            const savedPref = localStorage.getItem('PREFERRED_AI') || 'groq';
+            document.getElementById('cfgPrefAI').value = ['glm', 'custom'].includes(savedPref) ? savedPref : 'groq';
             
+            document.getElementById('cfgCustomURL').value = localStorage.getItem('CUSTOM_API_URL') || '';
+            document.getElementById('cfgCustomKey').value = localStorage.getItem('CUSTOM_API_KEY') || '';
+            document.getElementById('cfgCustomModel').value = localStorage.getItem('CUSTOM_MODEL') || '';
+
+            document.getElementById('cfgGroq').value = localStorage.getItem('GROQ_API_KEY') || '';
+            document.getElementById('cfgGroqModel').value = localStorage.getItem('GROQ_MODEL') || 'llama-3.3-70b-versatile';
+            document.getElementById('cfgGLM').value = localStorage.getItem('GLM_API_KEY') || '';
+            document.getElementById('cfgGLMModel').value = localStorage.getItem('GLM_MODEL') || 'GLM-4.5-Flash';
             document.getElementById('settingsModal').style.display = 'flex';
         }
 
@@ -615,11 +599,9 @@ def generate_index_template():
             document.getElementById('settingsModal').style.display = 'none';
         }
 
+        // 保存配置核心函数：立即收起键盘、关闭配置框、弹出卡片并自动消失
         function saveConfigAndNotify(e) {
-            if (e) { 
-                e.preventDefault(); 
-                e.stopPropagation(); 
-            }
+            if (e) { e.preventDefault(); e.stopPropagation(); }
             try {
                 if (document.activeElement) document.activeElement.blur();
                 
@@ -628,17 +610,16 @@ def generate_index_template():
                 localStorage.setItem('GH_TOKEN', (document.getElementById('cfgGhToken').value || '').trim());
                 localStorage.setItem('GH_OWNER', (document.getElementById('cfgGhOwner').value || '').trim());
                 
-                // 保存通用 AI 配置
-                localStorage.setItem('CUSTOM_AI_URL', (document.getElementById('cfgAiUrl').value || '').trim());
-                localStorage.setItem('CUSTOM_AI_KEY', (document.getElementById('cfgAiKey').value || '').trim());
-                localStorage.setItem('CUSTOM_AI_MODEL', (document.getElementById('cfgAiModel').value || '').trim());
+                localStorage.setItem('PREFERRED_AI', document.getElementById('cfgPrefAI').value || 'groq');
+                
+                localStorage.setItem('CUSTOM_API_URL', (document.getElementById('cfgCustomURL').value || '').trim());
+                localStorage.setItem('CUSTOM_API_KEY', (document.getElementById('cfgCustomKey').value || '').trim());
+                localStorage.setItem('CUSTOM_MODEL', (document.getElementById('cfgCustomModel').value || '').trim());
 
-                // 清理旧的硬编码模型变量以免污染
-                localStorage.removeItem('PREFERRED_AI');
-                localStorage.removeItem('GROQ_API_KEY');
-                localStorage.removeItem('GROQ_MODEL');
-                localStorage.removeItem('GLM_API_KEY');
-                localStorage.removeItem('GLM_MODEL');
+                localStorage.setItem('GROQ_API_KEY', (document.getElementById('cfgGroq').value || '').trim());
+                localStorage.setItem('GROQ_MODEL', (document.getElementById('cfgGroqModel').value || '').trim());
+                localStorage.setItem('GLM_API_KEY', (document.getElementById('cfgGLM').value || '').trim());
+                localStorage.setItem('GLM_MODEL', (document.getElementById('cfgGLMModel').value || '').trim());
 
                 closeConfigModal();
                 popToast('配置已本地保存！', 1200);
@@ -651,13 +632,10 @@ def generate_index_template():
             const yearSelect = document.getElementById('yearSelect');
             yearSelect.innerHTML = '';
             const allYears = new Set(Object.keys(archiveData).map(Number));
-            for(let i = -5; i <= 50; i++) {
-                allYears.add(today.getFullYear() + i);
-            }
+            for(let i = -5; i <= 50; i++) allYears.add(today.getFullYear() + i);
             Array.from(allYears).sort((a, b) => b - a).forEach(y => { 
                 const opt = document.createElement('option'); 
-                opt.value = y; 
-                opt.textContent = y + ' 年'; 
+                opt.value = y; opt.textContent = y + ' 年'; 
                 yearSelect.appendChild(opt); 
             });
         }
@@ -671,8 +649,7 @@ def generate_index_template():
 
             const daysGrid = document.getElementById('daysGrid');
             const newsList = document.getElementById('newsList');
-            daysGrid.innerHTML = ''; 
-            newsList.innerHTML = '';
+            daysGrid.innerHTML = ''; newsList.innerHTML = '';
 
             try {
                 const firstDay = new Date(AppState.year, AppState.month - 1, 1).getDay() || 7;
@@ -685,32 +662,14 @@ def generate_index_template():
                 const monthData = (archiveData[AppState.year] && archiveData[AppState.year][AppState.month]) || {};
                 
                 for (let day = 1; day <= maxDay; day++) {
-                    const cell = document.createElement('div'); 
-                    cell.className = 'day-cell'; 
-                    cell.textContent = day;
+                    const cell = document.createElement('div'); cell.className = 'day-cell'; cell.textContent = day;
+                    const dot = document.createElement('div'); dot.className = 'dot'; cell.appendChild(dot);
                     
-                    const dot = document.createElement('div'); 
-                    dot.className = 'dot'; 
-                    cell.appendChild(dot);
+                    if (monthData[day] && monthData[day].length > 0) cell.classList.add('has-news'); else cell.classList.add('no-news');
+                    if (AppState.year === today.getFullYear() && AppState.month === today.getMonth() + 1 && day === today.getDate()) cell.classList.add('today');
+                    if (day === AppState.day) cell.classList.add('selected');
                     
-                    if (monthData[day] && monthData[day].length > 0) {
-                        cell.classList.add('has-news'); 
-                    } else {
-                        cell.classList.add('no-news');
-                    }
-                    
-                    if (AppState.year === today.getFullYear() && AppState.month === today.getMonth() + 1 && day === today.getDate()) {
-                        cell.classList.add('today');
-                    }
-                    
-                    if (day === AppState.day) {
-                        cell.classList.add('selected');
-                    }
-                    
-                    cell.onclick = () => { 
-                        AppState.day = day; 
-                        forceRender(); 
-                    };
+                    cell.onclick = () => { AppState.day = day; forceRender(); };
                     daysGrid.appendChild(cell);
                 }
             } catch (err) {}
@@ -723,18 +682,12 @@ def generate_index_template():
                 
                 if (dayData && Array.isArray(dayData) && dayData.length > 0) {
                     dayData.forEach((news, index) => {
-                        const wrapper = document.createElement('div'); 
-                        wrapper.className = 'news-item-wrapper';
-                        
-                        const a = document.createElement('a'); 
-                        a.href = news.path; 
-                        a.className = 'news-item';
+                        const wrapper = document.createElement('div'); wrapper.className = 'news-item-wrapper';
+                        const a = document.createElement('a'); a.href = news.path; a.className = 'news-item';
                         a.innerHTML = `<span class="news-title" style="color: var(--primary);">${news.title} (${news.time})</span>`;
                         wrapper.appendChild(a);
 
-                        const delBtn = document.createElement('button'); 
-                        delBtn.className = 'delete-btn'; 
-                        delBtn.innerHTML = '🗑️';
+                        const delBtn = document.createElement('button'); delBtn.className = 'delete-btn'; delBtn.innerHTML = '🗑️';
                         if (AppState.deleteMode) delBtn.style.display = 'block';
                         
                         delBtn.onclick = async (e) => {
@@ -742,15 +695,12 @@ def generate_index_template():
                             if(confirm('确认删除此条目并同步删除云端文件吗？')) {
                                 const pathToDelete = news.path; 
                                 dayData.splice(index, 1);
-                                if (dayData.length === 0) {
-                                    delete archiveData[AppState.year][AppState.month][AppState.day];
-                                }
+                                if (dayData.length === 0) delete archiveData[AppState.year][AppState.month][AppState.day];
                                 forceRender(); 
                                 await syncDeleteToGithub(pathToDelete);
                             }
                         };
-                        wrapper.appendChild(delBtn); 
-                        newsList.appendChild(wrapper);
+                        wrapper.appendChild(delBtn); newsList.appendChild(wrapper);
                     });
                 } else { 
                     newsList.innerHTML = '<div class="empty-state">当日暂无 TikTok 归档记录 👀</div>'; 
@@ -758,36 +708,11 @@ def generate_index_template():
             } catch (err) {}
         }
 
-        document.getElementById('yearSelect').addEventListener('change', (e) => { 
-            AppState.year = parseInt(e.target.value, 10); 
-            forceRender(); 
-        });
-        document.getElementById('monthSelect').addEventListener('change', (e) => { 
-            AppState.month = parseInt(e.target.value, 10); 
-            forceRender(); 
-        });
-        document.getElementById('prevBtn').addEventListener('click', () => { 
-            AppState.month--; 
-            if (AppState.month < 1) { 
-                AppState.month = 12; 
-                AppState.year--; 
-            } 
-            forceRender(); 
-        });
-        document.getElementById('nextBtn').addEventListener('click', () => { 
-            AppState.month++; 
-            if (AppState.month > 12) { 
-                AppState.month = 1; 
-                AppState.year++; 
-            } 
-            forceRender(); 
-        });
-        document.getElementById('todayBtn').addEventListener('click', () => { 
-            AppState.year = today.getFullYear(); 
-            AppState.month = today.getMonth() + 1; 
-            AppState.day = today.getDate(); 
-            forceRender(); 
-        });
+        document.getElementById('yearSelect').addEventListener('change', (e) => { AppState.year = parseInt(e.target.value, 10); forceRender(); });
+        document.getElementById('monthSelect').addEventListener('change', (e) => { AppState.month = parseInt(e.target.value, 10); forceRender(); });
+        document.getElementById('prevBtn').addEventListener('click', () => { AppState.month--; if (AppState.month < 1) { AppState.month = 12; AppState.year--; } forceRender(); });
+        document.getElementById('nextBtn').addEventListener('click', () => { AppState.month++; if (AppState.month > 12) { AppState.month = 1; AppState.year++; } forceRender(); });
+        document.getElementById('todayBtn').addEventListener('click', () => { AppState.year = today.getFullYear(); AppState.month = today.getMonth() + 1; AppState.day = today.getDate(); forceRender(); });
 
         let lastTap = 0;
         document.querySelector('.calendar-wrapper').addEventListener('click', (e) => {
@@ -800,8 +725,7 @@ def generate_index_template():
             lastTap = new Date().getTime();
         });
 
-        initSelects(); 
-        forceRender();
+        initSelects(); forceRender();
 
         async function syncDeleteToGithub(fileRelPath) {
             const ghToken = localStorage.getItem('GH_TOKEN');
@@ -809,154 +733,130 @@ def generate_index_template():
             const ghRepo = 'Tiktok-File';
             
             if (!ghToken || !ghOwner) return;
-            
             try {
-                const loadingBar = document.getElementById('loadingBar'); 
-                loadingBar.style.width = '10%';
-                
+                const loadingBar = document.getElementById('loadingBar'); loadingBar.style.width = '10%';
                 const targetFilePath = `docs/${fileRelPath}`;
-                const fileRes = await fetch(`https://api.github.com/repos/${ghOwner}/${ghRepo}/contents/${targetFilePath}`, { 
-                    headers: { 'Authorization': `token ${ghToken}` } 
-                });
+                const fileRes = await fetch(`https://api.github.com/repos/${ghOwner}/${ghRepo}/contents/${targetFilePath}`, { headers: { 'Authorization': `token ${ghToken}` } });
                 
                 if (fileRes.ok) {
                     const fileData = await fileRes.json();
                     await fetch(`https://api.github.com/repos/${ghOwner}/${ghRepo}/contents/${targetFilePath}`, {
                         method: 'DELETE',
-                        headers: { 
-                            'Authorization': `token ${ghToken}`, 
-                            'Content-Type': 'application/json' 
-                        },
-                        body: JSON.stringify({ 
-                            message: `Delete archived tiktok file: ${fileRelPath}`, 
-                            sha: fileData.sha 
-                        })
+                        headers: { 'Authorization': `token ${ghToken}`, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ message: `Delete archived tiktok file: ${fileRelPath}`, sha: fileData.sha })
                     });
                 }
                 
                 loadingBar.style.width = '50%';
-                
-                const idxRes = await fetch(`https://api.github.com/repos/${ghOwner}/${ghRepo}/contents/docs/index.html`, { 
-                    headers: { 'Authorization': `token ${ghToken}` } 
-                });
+                const idxRes = await fetch(`https://api.github.com/repos/${ghOwner}/${ghRepo}/contents/docs/index.html`, { headers: { 'Authorization': `token ${ghToken}` } });
                 const idxData = await idxRes.json();
-                
                 const idxContent = decodeURIComponent(escape(atob(idxData.content)));
                 const dataStart = idxContent.indexOf('/*DATA_START*/') + 14;
                 const dataEnd = idxContent.indexOf('/*DATA_END*/');
-                
                 const newJsonStr = JSON.stringify(archiveData);
                 const newIdxContent = idxContent.substring(0, dataStart) + newJsonStr + idxContent.substring(dataEnd);
 
                 loadingBar.style.width = '80%';
                 await fetch(`https://api.github.com/repos/${ghOwner}/${ghRepo}/contents/docs/index.html`, {
                     method: 'PUT',
-                    headers: { 
-                        'Authorization': `token ${ghToken}`, 
-                        'Content-Type': 'application/json' 
-                    },
-                    body: JSON.stringify({ 
-                        message: `Update index.html after deleting file`, 
-                        content: btoa(unescape(encodeURIComponent(newIdxContent))), 
-                        sha: idxData.sha 
-                    })
+                    headers: { 'Authorization': `token ${ghToken}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: `Update index.html after deleting file`, content: btoa(unescape(encodeURIComponent(newIdxContent))), sha: idxData.sha })
                 });
                 
-                loadingBar.style.width = '100%'; 
-                setTimeout(() => { loadingBar.style.width = '0%'; }, 1000);
-            } catch(e) {
-                console.error("Delete sync error:", e);
-            }
+                loadingBar.style.width = '100%'; setTimeout(() => { loadingBar.style.width = '0%'; }, 1000);
+            } catch(e) {}
         }
 
+        // ================= 终极 TikTok 短链/长链多通道解析引擎 =================
         async function resolveTikTokVideoData(rawInput) {
             let text = rawInput.trim();
             
-            // 纯数字 ID
+            // 1. 如果输入为纯数字 Video ID
             if (/^\d{15,22}$/.test(text)) return { id: text };
             
-            // 完整视频链接中的 ID
+            // 2. 如果是标准完整长链 (/video/731130232...)
             let match = text.match(/\/video\/(\d{15,22})/);
             if (match) return { id: match[1] };
-            
-            // 文本中混杂的数字 ID
+
+            // 3. 增强正则：匹配游离的15到22位数字ID
             let matchAlt = text.match(/\b\d{15,22}\b/);
             if (matchAlt) return { id: matchAlt[0] };
-            
-            // 短链接解析通道
+
+            // 4. 如果是 vt.tiktok.com 或 vm.tiktok.com 等短链
             if (text.includes('tiktok.com') || text.includes('douyin.com')) {
-                // 通道一：Lovetik
+                
+                // 【通道一】：Lovetik 极速解析引擎
                 try {
-                    const formData = new URLSearchParams(); 
+                    const formData = new URLSearchParams();
                     formData.append('query', text);
-                    const res = await fetch('https://lovetik.com/api/ajax/search', { 
-                        method: 'POST', 
-                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, 
-                        body: formData.toString() 
+                    const res = await fetch('https://lovetik.com/api/ajax/search', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: formData.toString()
                     });
-                    if (res.ok) { 
-                        const json = await res.json(); 
+                    if (res.ok) {
+                        const json = await res.json();
                         if (json && json.vid) {
-                            return { 
-                                id: String(json.vid), 
-                                title: json.desc || '', 
-                                channel: json.author ? '@' + json.author : '', 
-                                thumb: json.cover || '' 
+                            return {
+                                id: String(json.vid),
+                                title: json.desc || '',
+                                channel: json.author ? '@' + json.author : '',
+                                thumb: json.cover || ''
                             };
                         }
                     }
-                } catch (e) {}
-                
-                // 通道二：TikWM
+                } catch (e) { console.warn("Lovetik 通道受阻:", e); }
+
+                // 【通道二】：TikWM 直解析引擎
                 try {
                     const res = await fetch(`https://www.tikwm.com/api/?url=${encodeURIComponent(text)}`);
-                    if (res.ok) { 
-                        const json = await res.json(); 
+                    if (res.ok) {
+                        const json = await res.json();
                         if (json && json.data && json.data.id) {
-                            return { 
-                                id: String(json.data.id), 
-                                title: json.data.title || '', 
-                                channel: json.data.author ? '@' + (json.data.author.nickname || json.data.author.unique_id) : '', 
-                                thumb: json.data.cover || json.data.origin_cover || '' 
+                            return {
+                                id: String(json.data.id),
+                                title: json.data.title || '',
+                                channel: json.data.author ? '@' + (json.data.author.nickname || json.data.author.unique_id) : '',
+                                thumb: json.data.cover || json.data.origin_cover || ''
                             };
                         }
                     }
-                } catch (e) {}
+                } catch (e) { console.warn("TikWM 通道受阻:", e); }
                 
-                // 通道三：Codetabs 代理
+                // 【通道三】：Codetabs Proxy 网页源码正则反查
                 try {
                     const res = await fetch(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(text)}`);
-                    if (res.ok) { 
-                        const html = await res.text(); 
-                        const m = html.match(/"aweme_id":"(\d{15,22})"/); 
-                        if (m) return { id: m[1] }; 
+                    if (res.ok) {
+                        const html = await res.text();
+                        const m = html.match(/"aweme_id":"(\d{15,22})"/);
+                        if (m) return { id: m[1] };
                     }
-                } catch (e) {}
-                
-                // 通道四：AllOrigins oEmbed
+                } catch (e) { console.warn("Codetabs 通道受阻:", e); }
+
+                // 【通道四】：AllOrigins 深层 HTML 解包
                 try {
                     const oembedUrl = `https://www.tiktok.com/oembed?url=${encodeURIComponent(text)}`;
                     const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(oembedUrl)}`);
-                    if (res.ok) { 
-                        const json = await res.json(); 
-                        if (json && json.contents) { 
-                            const oData = JSON.parse(json.contents); 
-                            let embedUrl = oData.embed_url || oData.html || ""; 
-                            const m = embedUrl.match(/\/video\/(\d{15,22})/); 
-                            if (m) return { id: m[1] }; 
-                        } 
+                    if (res.ok) {
+                        const json = await res.json();
+                        if (json && json.contents) {
+                            const oData = JSON.parse(json.contents);
+                            let embedUrl = oData.embed_url || oData.html || "";
+                            const m = embedUrl.match(/\/video\/(\d{15,22})/);
+                            if (m) return { id: m[1] };
+                        }
                     }
                 } catch (e) {}
-                
-                // 通道五：Unshorten
+
+                // 【通道五】：Unshorten 简单重定向反查
                 try {
                     const res = await fetch(`https://unshorten.me/json/${encodeURIComponent(text)}`);
-                    if (res.ok) { 
-                        const json = await res.json(); 
-                        if (json && json.resolved_url) { 
-                            const m = json.resolved_url.match(/\/video\/(\d{15,22})/); 
-                            if (m) return { id: m[1] }; 
-                        } 
+                    if (res.ok) {
+                        const json = await res.json();
+                        if (json && json.resolved_url) {
+                            const m = json.resolved_url.match(/\/video\/(\d{15,22})/);
+                            if (m) return { id: m[1] };
+                        }
                     }
                 } catch (e) {}
             }
@@ -998,13 +898,9 @@ def generate_index_template():
                     let videoCover = videoMeta.thumb || "https://p16-va.tiktokcdn.com/obj/tos-maliva-p-0068/default_cover.jpeg";
                     let videoUrl = `https://www.tiktok.com/video/${videoId}`;
 
-                    // 获取视频详细信息
                     try {
                         const vRes = await fetch(`https://${rapidHost}/api/post/detail?videoId=${videoId}`, {
-                            headers: { 
-                                'x-rapidapi-host': rapidHost, 
-                                'x-rapidapi-key': rapidKey 
-                            }
+                            headers: { 'x-rapidapi-host': rapidHost, 'x-rapidapi-key': rapidKey }
                         });
                         if (vRes.ok) {
                             const vData = await vRes.json();
@@ -1020,19 +916,10 @@ def generate_index_template():
                     } catch(err) {}
 
                     loadingBar.style.width = '60%';
-                    
-                    // 获取评论列表
                     const cRes = await fetch(`https://${rapidHost}/api/post/comments?videoId=${videoId}&count=40&cursor=0`, {
-                        headers: { 
-                            'x-rapidapi-host': rapidHost, 
-                            'x-rapidapi-key': rapidKey 
-                        }
+                        headers: { 'x-rapidapi-host': rapidHost, 'x-rapidapi-key': rapidKey }
                     });
-                    
-                    if (!cRes.ok) {
-                        throw new Error(`RapidAPI 响应错误 (状态码: ${cRes.status})`);
-                    }
-                    
+                    if (!cRes.ok) throw new Error(`RapidAPI 响应错误 (状态码: ${cRes.status})`);
                     const cData = await cRes.json();
                     const rawComments = (cData.data && cData.data.comments) || cData.comments || [];
                     
@@ -1058,14 +945,7 @@ def generate_index_template():
                     comments = comments.slice(0, 35);
 
                     loadingBar.style.width = '75%';
-                    
-                    const videoObj = { 
-                        title: videoTitle, 
-                        channel: videoChannel, 
-                        thumb: videoCover, 
-                        url: videoUrl, 
-                        id: videoId 
-                    };
+                    const videoObj = { title: videoTitle, channel: videoChannel, thumb: videoCover, url: videoUrl, id: videoId };
                     const htmlOutput = generateBaseHTMLString(videoObj, comments, AppState.year, AppState.month, AppState.day);
 
                     const now = new Date();
@@ -1078,99 +958,63 @@ def generate_index_template():
                     const fileRelPath = `${yearStr}/${monthStr}/${filename}`;
 
                     loadingBar.style.width = '85%';
-                    
-                    // 将生成的文件推送到 GitHub
                     await fetch(`https://api.github.com/repos/${ghOwner}/${ghRepo}/contents/docs/${fileRelPath}`, {
                         method: 'PUT',
-                        headers: { 
-                            'Authorization': `token ${ghToken}`, 
-                            'Content-Type': 'application/json' 
-                        },
-                        body: JSON.stringify({ 
-                            message: `Add tiktok video: ${videoTitle.substring(0, 30)}`, 
-                            content: btoa(unescape(encodeURIComponent(htmlOutput))) 
-                        })
+                        headers: { 'Authorization': `token ${ghToken}`, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ message: `Add tiktok video: ${videoTitle.substring(0, 30)}`, content: btoa(unescape(encodeURIComponent(htmlOutput))) })
                     });
 
                     loadingBar.style.width = '95%';
-                    
-                    // 更新索引文件
-                    const idxRes = await fetch(`https://api.github.com/repos/${ghOwner}/${ghRepo}/contents/docs/index.html`, { 
-                        headers: { 'Authorization': `token ${ghToken}` } 
-                    });
+                    const idxRes = await fetch(`https://api.github.com/repos/${ghOwner}/${ghRepo}/contents/docs/index.html`, { headers: { 'Authorization': `token ${ghToken}` } });
                     const idxData = await idxRes.json();
-                    
                     const idxContent = decodeURIComponent(escape(atob(idxData.content)));
                     const dataStart = idxContent.indexOf('/*DATA_START*/') + 14;
                     const dataEnd = idxContent.indexOf('/*DATA_END*/');
-                    
                     const archiveObj = JSON.parse(idxContent.substring(dataStart, dataEnd));
 
                     if (!archiveObj[yearStr]) archiveObj[yearStr] = {};
                     if (!archiveObj[yearStr][monthStr]) archiveObj[yearStr][monthStr] = {};
                     if (!archiveObj[yearStr][monthStr][dayStr]) archiveObj[yearStr][monthStr][dayStr] = [];
                     
-                    const newItem = { 
-                        time: hhmmStr, 
-                        path: fileRelPath, 
-                        title: `🎵 TikTok 单集精读: ${videoTitle}` 
-                    };
-                    
+                    const newItem = { time: hhmmStr, path: fileRelPath, title: `🎵 TikTok 单集精读: ${videoTitle}` };
                     archiveObj[yearStr][monthStr][dayStr].unshift(newItem);
-                    
                     const newIdxContent = idxContent.substring(0, dataStart) + JSON.stringify(archiveObj) + idxContent.substring(dataEnd);
                     
                     await fetch(`https://api.github.com/repos/${ghOwner}/${ghRepo}/contents/docs/index.html`, {
                         method: 'PUT',
-                        headers: { 
-                            'Authorization': `token ${ghToken}`, 
-                            'Content-Type': 'application/json' 
-                        },
-                        body: JSON.stringify({ 
-                            message: `Update calendar index`, 
-                            content: btoa(unescape(encodeURIComponent(newIdxContent))), 
-                            sha: idxData.sha 
-                        })
+                        headers: { 'Authorization': `token ${ghToken}`, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ message: `Update calendar index`, content: btoa(unescape(encodeURIComponent(newIdxContent))), sha: idxData.sha })
                     });
 
-                    // 本地状态更新
                     if (!archiveData[yearStr]) archiveData[yearStr] = {};
                     if (!archiveData[yearStr][monthStr]) archiveData[yearStr][monthStr] = {};
                     if (!archiveData[yearStr][monthStr][dayStr]) archiveData[yearStr][monthStr][dayStr] = [];
                     archiveData[yearStr][monthStr][dayStr].unshift(newItem);
 
                     forceRender(); 
-                    
                     loadingBar.style.width = '100%';
                     popToast('🎉 抓取并归档成功！', 1500);
                     this.value = '';
                     setTimeout(() => { loadingBar.style.width = '0%'; }, 1500);
-                    
                 } catch (err) {
                     alert('❌ 操作失败: ' + err.message); 
                     loadingBar.style.width = '0%';
-                } finally { 
-                    this.disabled = false; 
-                }
+                } finally { this.disabled = false; }
             }
         });
 
         // ================= 数据驱动防污染生成器 =================
         const ENGINE_B64 = 'REPLACEME_ENGINE_B64';
-        
         function b64DecodeUnicode(str) {
             return decodeURIComponent(atob(str).split('').map(function(c) {
                 return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
             }).join(''));
         }
-        
         const engineScriptContent = b64DecodeUnicode(ENGINE_B64);
 
         function generateBaseHTMLString(video, comments, sYear, sMonth, sDay) {
             const pageData = {
-                year: sYear, 
-                month: sMonth, 
-                day: sDay,
+                year: sYear, month: sMonth, day: sDay,
                 video: {
                     title: video.title,
                     channel: video.channel,
@@ -1191,11 +1035,7 @@ def generate_index_template():
 
             function escapeHTML(str) {
                 if (typeof str !== 'string') return '';
-                return str.replace(/&/g, '&amp;')
-                          .replace(/</g, '&lt;')
-                          .replace(/>/g, '&gt;')
-                          .replace(/"/g, '&quot;')
-                          .replace(/'/g, '&#039;');
+                return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
             }
 
             let comments_html = "";
@@ -1309,7 +1149,7 @@ def generate_index_template():
     os.makedirs(BASE_DIR, exist_ok=True)
     with open(os.path.join(BASE_DIR, "index.html"), "w", encoding="utf-8") as f:
         f.write(html_template)
-    print("✅ `docs/index.html` 纯客户端日历枢纽构建完成（通用全系 AI 接口适配，无压缩完整版）！")
+    print("✅ `docs/index.html` 纯客户端日历枢纽构建完成（已加入兼容 OpenAI 协议的自定义 API 配置模块）！")
 
 if __name__ == "__main__":
     generate_index_template()
