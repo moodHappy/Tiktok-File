@@ -47,69 +47,47 @@ const AI_PROMPT = `你是一位精通美国年轻一代流行语、TikTok 梗文
 评论内容：
 `;
 
-async function fetchGroq(text, apiKey, modelName) {
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            model: modelName,
-            messages: [
-                { role: 'system', content: 'You are an expert English teacher specialized in Gen-Z slang and internet culture.' },
-                { role: 'user', content: AI_PROMPT + `"${text}"` }
-            ],
-            temperature: 0.3
-        })
-    });
-    if (!res.ok) throw new Error(`Groq API Error: ${res.status}`);
-    const json = await res.json();
-    if (json.choices && json.choices.length > 0) return json.choices[0].message.content.trim();
-    throw new Error('Groq返回数据异常');
-}
+// 通用 AI 请求引擎 (支持所有 OpenAI 格式兼容的 API)
+async function fetchUniversalAI(text, apiUrl, apiKey, modelName) {
+    const payload = {
+        model: modelName,
+        messages: [
+            { role: 'system', content: 'You are an expert English teacher specialized in Gen-Z slang and internet culture.' },
+            { role: 'user', content: AI_PROMPT + `"${text}"` }
+        ],
+        temperature: 0.3
+    };
 
-async function fetchGLM(text, apiKey, modelName) {
-    const res = await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', {
+    const res = await fetch(apiUrl, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            model: modelName,
-            messages: [
-                { role: 'system', content: 'You are an expert English teacher specialized in Gen-Z slang and internet culture.' },
-                { role: 'user', content: AI_PROMPT + `"${text}"` }
-            ],
-            temperature: 0.3
-        })
+        headers: { 
+            'Authorization': `Bearer ${apiKey}`, 
+            'Content-Type': 'application/json' 
+        },
+        body: JSON.stringify(payload)
     });
-    if (!res.ok) throw new Error(`智谱GLM API Error: ${res.status}`);
+    
+    if (!res.ok) {
+        let errDesc = '';
+        try { const errJson = await res.json(); errDesc = JSON.stringify(errJson); } catch(e) {}
+        throw new Error(`API Error ${res.status}: ${errDesc}`);
+    }
+    
     const json = await res.json();
-    if (json.choices && json.choices.length > 0) return json.choices[0].message.content.trim();
-    throw new Error('智谱GLM返回数据异常');
+    if (json.choices && json.choices.length > 0 && json.choices[0].message) {
+        return json.choices[0].message.content.trim();
+    }
+    throw new Error('AI返回数据异常或格式不兼容，请确认该接口支持 OpenAI 标准格式。');
 }
 
 async function executeAIPipeline(text) {
-    const pref = localStorage.getItem('PREFERRED_AI') || 'groq';
-    const groqKey = localStorage.getItem('GROQ_API_KEY') || '';
-    const glmKey = localStorage.getItem('GLM_API_KEY') || '';
-    const groqModel = localStorage.getItem('GROQ_MODEL') || 'llama-3.3-70b-versatile';
-    const glmModel = localStorage.getItem('GLM_MODEL') || 'GLM-4.5-Flash';
+    const apiUrl = localStorage.getItem('CUSTOM_AI_URL') || '';
+    const apiKey = localStorage.getItem('CUSTOM_AI_KEY') || '';
+    const modelName = localStorage.getItem('CUSTOM_AI_MODEL') || '';
 
-    if ((!groqKey && !glmKey) || (!groqModel && !glmModel)) throw new Error('MISSING_KEYS_OR_MODELS');
+    if (!apiUrl || !apiKey || !modelName) throw new Error('MISSING_AI_CONFIG');
 
-    const runGroq = async () => { if (!groqKey || !groqModel) throw new Error("Groq 配置缺失"); return await fetchGroq(text, groqKey, groqModel); };
-    const runGLM = async () => { if (!glmKey || !glmModel) throw new Error("智谱GLM 配置缺失"); return await fetchGLM(text, glmKey, glmModel); };
-
-    if (pref === 'groq') {
-        try { return await runGroq(); } catch (err) {
-            console.warn("Groq 失败，降级到智谱:", err);
-            if (glmKey && glmModel) { document.getElementById('sync-status').innerText = '⚠️ 降级为智谱...'; return await runGLM(); }
-            throw err;
-        }
-    } else {
-        try { return await runGLM(); } catch (err) {
-            console.warn("智谱 失败，降级到Groq:", err);
-            if (groqKey && groqModel) { document.getElementById('sync-status').innerText = '⚠️ 降级为Groq...'; return await runGroq(); }
-            throw err;
-        }
-    }
+    return await fetchUniversalAI(text, apiUrl, apiKey, modelName);
 }
 
 function initAnnotations() {
@@ -128,15 +106,14 @@ function initAnnotations() {
                 e.preventDefault(); e.stopPropagation();
                 if (aiToggle.classList.contains('loading')) return;
 
-                // 【防误触/防浪费确认】：已有内容时必须确认才覆盖
                 if (edit.value.trim().length > 0) {
                     const confirmOverwrite = confirm('⚠️ 当前已有批注内容，是否重新生成并覆盖？');
                     if (!confirmOverwrite) return;
                 }
 
-                const groqKey = localStorage.getItem('GROQ_API_KEY') || '';
-                const glmKey = localStorage.getItem('GLM_API_KEY') || '';
-                if (!groqKey && !glmKey) { alert('⚠️ 请先返回日历配置中心设置 AI API Key！'); return; }
+                const aiUrl = localStorage.getItem('CUSTOM_AI_URL') || '';
+                const aiKey = localStorage.getItem('CUSTOM_AI_KEY') || '';
+                if (!aiUrl || !aiKey) { alert('⚠️ 请先返回日历配置中心设置 AI 接口地址和 API Key！'); return; }
 
                 const pClone = wrap.querySelector('.card-text').cloneNode(true);
                 pClone.querySelectorAll('.anno-toggle, .ai-toggle').forEach(el => el.remove());
@@ -157,7 +134,7 @@ function initAnnotations() {
                     setTimeout(() => { if (statusMsg.innerText.includes('成功')) statusMsg.style.display = 'none'; }, 2000);
                 } catch (err) {
                     console.error(err);
-                    alert(err.message === 'MISSING_KEYS_OR_MODELS' ? '⚠️ 请返回配置AI密钥和模型！' : '❌ AI 解析失败: ' + err.message);
+                    alert(err.message === 'MISSING_AI_CONFIG' ? '⚠️ 请返回配置 AI 接口和模型！' : '❌ AI 解析失败: ' + err.message);
                     statusMsg.style.display = 'none';
                 } finally { aiToggle.classList.remove('loading'); }
             });
@@ -381,6 +358,7 @@ def generate_index_template():
         .form-group { margin-bottom: 15px; }
         .form-group label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 5px; font-weight: bold; }
         .form-group input { width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; background: #fff; color: #333; }
+        .form-group p.help-text { font-size: 11px; color: #999; margin: 4px 0 0 0; line-height: 1.3; }
         
         /* 移动端高兼容下拉框样式 */
         .form-group select {
@@ -423,7 +401,7 @@ def generate_index_template():
         .empty-state { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 14px; background: var(--card); border-radius: 14px; }
         #loadingBar { height: 3px; background: var(--primary); width: 0%; transition: width 0.3s; position: absolute; top: 0; left: 0; z-index: 30; }
 
-        /* 全局居中模态卡片提示 (z-index 设为最高 99999) */
+        /* 全局居中模态卡片提示 */
         .toast-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.45); z-index: 99999; justify-content: center; align-items: center; }
         .toast-card { background: #ffffff; border-radius: 18px; padding: 25px 30px; text-align: center; box-shadow: 0 12px 30px rgba(0,0,0,0.2); max-width: 280px; width: 75%; animation: toastScale 0.2s ease-out; }
         .toast-icon { font-size: 40px; margin-bottom: 8px; line-height: 1; }
@@ -434,7 +412,6 @@ def generate_index_template():
 <body>
     <div id="loadingBar"></div>
 
-    <!-- 居中自动关闭卡片 -->
     <div class="toast-overlay" id="toastOverlay">
         <div class="toast-card">
             <div class="toast-icon">✅</div>
@@ -450,7 +427,7 @@ def generate_index_template():
     <div class="modal-overlay" id="settingsModal">
         <div class="modal-content">
             <h3 class="modal-title">本地配置中心</h3>
-            <p style="font-size:12px; color:#888; margin-top:-10px; margin-bottom:15px;">密钥保存在本地浏览器中，绝不会硬编码泄露在仓库代码中。</p>
+            <p style="font-size:12px; color:#888; margin-top:-10px; margin-bottom:15px;">所有密钥仅保存在本地浏览器缓存中。</p>
             
             <div class="form-group"><label>RapidAPI Key (TikTok 数据源)</label><input type="password" id="cfgRapidKey" placeholder="例如 a52da3c..."></div>
             <div class="form-group"><label>RapidAPI Host (默认 tiktok-api23)</label><input type="text" id="cfgRapidHost" placeholder="tiktok-api23.p.rapidapi.com"></div>
@@ -462,21 +439,16 @@ def generate_index_template():
                 <div style="flex:1;"><label>仓库 (写死)</label><input type="text" value="Tiktok-File" readonly disabled style="background:#eee; color:#888;"></div>
             </div>
 
+            <!-- 通用 AI 接口配置区 -->
             <div style="border-top:1px dashed #ddd; margin: 15px 0;"></div>
             <div class="form-group">
-                <label>首选 AI 引擎 (批注助手)</label>
-                <select id="cfgPrefAI">
-                    <option value="groq">Groq</option>
-                    <option value="glm">智谱</option>
-                </select>
+                <label>🌐 通用 AI 接口地址 (API URL)</label>
+                <input type="text" id="cfgAiUrl" placeholder="如: https://api.chatanywhere.tech/v1/chat/completions">
+                <p class="help-text">需精确到 <code>/v1/chat/completions</code>。<br/>支持任何兼容 OpenAI 格式的 API (如 DeepSeek, 豆包, Kimi, Qwen, ChatAnywhere, Groq 等)。</p>
             </div>
             <div class="form-group" style="display:flex; gap:10px;">
-                <div style="flex:1;"><label>Groq Key</label><input type="password" id="cfgGroq" placeholder="gsk_..."></div>
-                <div style="flex:1;"><label>Groq 模型</label><input type="text" id="cfgGroqModel" placeholder="llama-3.3-70b-versatile"></div>
-            </div>
-            <div class="form-group" style="display:flex; gap:10px;">
-                <div style="flex:1;"><label>智谱 Key</label><input type="password" id="cfgGLM" placeholder="..."></div>
-                <div style="flex:1;"><label>智谱 模型</label><input type="text" id="cfgGLMModel" placeholder="GLM-4.5-Flash"></div>
+                <div style="flex:1;"><label>🔑 API Key (密钥)</label><input type="password" id="cfgAiKey" placeholder="sk-..."></div>
+                <div style="flex:1;"><label>🧠 模型名称</label><input type="text" id="cfgAiModel" placeholder="gpt-3.5-turbo / deepseek-chat"></div>
             </div>
             
             <div class="modal-actions">
@@ -511,7 +483,6 @@ def generate_index_template():
         const today = new Date();
         const AppState = { year: today.getFullYear(), month: today.getMonth() + 1, day: today.getDate(), deleteMode: false };
 
-        // 弹窗提示并在指定时间后自动淡出消失
         function popToast(msg, duration = 1200) {
             const overlay = document.getElementById('toastOverlay');
             document.getElementById('toastText').innerText = msg;
@@ -527,13 +498,11 @@ def generate_index_template():
             document.getElementById('cfgGhToken').value = localStorage.getItem('GH_TOKEN') || '';
             document.getElementById('cfgGhOwner').value = localStorage.getItem('GH_OWNER') || '';
             
-            const savedPref = localStorage.getItem('PREFERRED_AI') || 'groq';
-            document.getElementById('cfgPrefAI').value = (savedPref === 'glm') ? 'glm' : 'groq';
-
-            document.getElementById('cfgGroq').value = localStorage.getItem('GROQ_API_KEY') || '';
-            document.getElementById('cfgGroqModel').value = localStorage.getItem('GROQ_MODEL') || 'llama-3.3-70b-versatile';
-            document.getElementById('cfgGLM').value = localStorage.getItem('GLM_API_KEY') || '';
-            document.getElementById('cfgGLMModel').value = localStorage.getItem('GLM_MODEL') || 'GLM-4.5-Flash';
+            // 读取通用 AI 配置
+            document.getElementById('cfgAiUrl').value = localStorage.getItem('CUSTOM_AI_URL') || '';
+            document.getElementById('cfgAiKey').value = localStorage.getItem('CUSTOM_AI_KEY') || '';
+            document.getElementById('cfgAiModel').value = localStorage.getItem('CUSTOM_AI_MODEL') || '';
+            
             document.getElementById('settingsModal').style.display = 'flex';
         }
 
@@ -541,7 +510,6 @@ def generate_index_template():
             document.getElementById('settingsModal').style.display = 'none';
         }
 
-        // 保存配置核心函数：立即收起键盘、关闭配置框、弹出卡片并自动消失
         function saveConfigAndNotify(e) {
             if (e) { e.preventDefault(); e.stopPropagation(); }
             try {
@@ -551,11 +519,18 @@ def generate_index_template():
                 localStorage.setItem('RAPIDAPI_HOST', (document.getElementById('cfgRapidHost').value || '').trim() || 'tiktok-api23.p.rapidapi.com');
                 localStorage.setItem('GH_TOKEN', (document.getElementById('cfgGhToken').value || '').trim());
                 localStorage.setItem('GH_OWNER', (document.getElementById('cfgGhOwner').value || '').trim());
-                localStorage.setItem('PREFERRED_AI', document.getElementById('cfgPrefAI').value || 'groq');
-                localStorage.setItem('GROQ_API_KEY', (document.getElementById('cfgGroq').value || '').trim());
-                localStorage.setItem('GROQ_MODEL', (document.getElementById('cfgGroqModel').value || '').trim());
-                localStorage.setItem('GLM_API_KEY', (document.getElementById('cfgGLM').value || '').trim());
-                localStorage.setItem('GLM_MODEL', (document.getElementById('cfgGLMModel').value || '').trim());
+                
+                // 保存通用 AI 配置
+                localStorage.setItem('CUSTOM_AI_URL', (document.getElementById('cfgAiUrl').value || '').trim());
+                localStorage.setItem('CUSTOM_AI_KEY', (document.getElementById('cfgAiKey').value || '').trim());
+                localStorage.setItem('CUSTOM_AI_MODEL', (document.getElementById('cfgAiModel').value || '').trim());
+
+                // 清理旧的硬编码模型变量以免污染
+                localStorage.removeItem('PREFERRED_AI');
+                localStorage.removeItem('GROQ_API_KEY');
+                localStorage.removeItem('GROQ_MODEL');
+                localStorage.removeItem('GLM_API_KEY');
+                localStorage.removeItem('GLM_MODEL');
 
                 closeConfigModal();
                 popToast('配置已本地保存！', 1200);
@@ -703,97 +678,35 @@ def generate_index_template():
             } catch(e) {}
         }
 
-        // ================= 终极 TikTok 短链/长链多通道解析引擎 =================
         async function resolveTikTokVideoData(rawInput) {
             let text = rawInput.trim();
-            
-            // 1. 如果输入为纯数字 Video ID
             if (/^\d{15,22}$/.test(text)) return { id: text };
-            
-            // 2. 如果是标准完整长链 (/video/731130232...)
             let match = text.match(/\/video\/(\d{15,22})/);
             if (match) return { id: match[1] };
-
-            // 3. 增强正则：匹配游离的15到22位数字ID
             let matchAlt = text.match(/\b\d{15,22}\b/);
             if (matchAlt) return { id: matchAlt[0] };
-
-            // 4. 如果是 vt.tiktok.com 或 vm.tiktok.com 等短链
             if (text.includes('tiktok.com') || text.includes('douyin.com')) {
-                
-                // 【通道一】：Lovetik 极速解析引擎
                 try {
-                    const formData = new URLSearchParams();
-                    formData.append('query', text);
-                    const res = await fetch('https://lovetik.com/api/ajax/search', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                        body: formData.toString()
-                    });
-                    if (res.ok) {
-                        const json = await res.json();
-                        if (json && json.vid) {
-                            return {
-                                id: String(json.vid),
-                                title: json.desc || '',
-                                channel: json.author ? '@' + json.author : '',
-                                thumb: json.cover || ''
-                            };
-                        }
-                    }
-                } catch (e) { console.warn("Lovetik 通道受阻:", e); }
-
-                // 【通道二】：TikWM 直解析引擎
+                    const formData = new URLSearchParams(); formData.append('query', text);
+                    const res = await fetch('https://lovetik.com/api/ajax/search', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: formData.toString() });
+                    if (res.ok) { const json = await res.json(); if (json && json.vid) return { id: String(json.vid), title: json.desc || '', channel: json.author ? '@' + json.author : '', thumb: json.cover || '' }; }
+                } catch (e) {}
                 try {
                     const res = await fetch(`https://www.tikwm.com/api/?url=${encodeURIComponent(text)}`);
-                    if (res.ok) {
-                        const json = await res.json();
-                        if (json && json.data && json.data.id) {
-                            return {
-                                id: String(json.data.id),
-                                title: json.data.title || '',
-                                channel: json.data.author ? '@' + (json.data.author.nickname || json.data.author.unique_id) : '',
-                                thumb: json.data.cover || json.data.origin_cover || ''
-                            };
-                        }
-                    }
-                } catch (e) { console.warn("TikWM 通道受阻:", e); }
-                
-                // 【通道三】：Codetabs Proxy 网页源码正则反查
+                    if (res.ok) { const json = await res.json(); if (json && json.data && json.data.id) return { id: String(json.data.id), title: json.data.title || '', channel: json.data.author ? '@' + (json.data.author.nickname || json.data.author.unique_id) : '', thumb: json.data.cover || json.data.origin_cover || '' }; }
+                } catch (e) {}
                 try {
                     const res = await fetch(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(text)}`);
-                    if (res.ok) {
-                        const html = await res.text();
-                        const m = html.match(/"aweme_id":"(\d{15,22})"/);
-                        if (m) return { id: m[1] };
-                    }
-                } catch (e) { console.warn("Codetabs 通道受阻:", e); }
-
-                // 【通道四】：AllOrigins 深层 HTML 解包
+                    if (res.ok) { const html = await res.text(); const m = html.match(/"aweme_id":"(\d{15,22})"/); if (m) return { id: m[1] }; }
+                } catch (e) {}
                 try {
                     const oembedUrl = `https://www.tiktok.com/oembed?url=${encodeURIComponent(text)}`;
                     const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(oembedUrl)}`);
-                    if (res.ok) {
-                        const json = await res.json();
-                        if (json && json.contents) {
-                            const oData = JSON.parse(json.contents);
-                            let embedUrl = oData.embed_url || oData.html || "";
-                            const m = embedUrl.match(/\/video\/(\d{15,22})/);
-                            if (m) return { id: m[1] };
-                        }
-                    }
+                    if (res.ok) { const json = await res.json(); if (json && json.contents) { const oData = JSON.parse(json.contents); let embedUrl = oData.embed_url || oData.html || ""; const m = embedUrl.match(/\/video\/(\d{15,22})/); if (m) return { id: m[1] }; } }
                 } catch (e) {}
-
-                // 【通道五】：Unshorten 简单重定向反查
                 try {
                     const res = await fetch(`https://unshorten.me/json/${encodeURIComponent(text)}`);
-                    if (res.ok) {
-                        const json = await res.json();
-                        if (json && json.resolved_url) {
-                            const m = json.resolved_url.match(/\/video\/(\d{15,22})/);
-                            if (m) return { id: m[1] };
-                        }
-                    }
+                    if (res.ok) { const json = await res.json(); if (json && json.resolved_url) { const m = json.resolved_url.match(/\/video\/(\d{15,22})/); if (m) return { id: m[1] }; } }
                 } catch (e) {}
             }
             return null;
@@ -1085,7 +998,7 @@ def generate_index_template():
     os.makedirs(BASE_DIR, exist_ok=True)
     with open(os.path.join(BASE_DIR, "index.html"), "w", encoding="utf-8") as f:
         f.write(html_template)
-    print("✅ `docs/index.html` 纯客户端日历枢纽构建完成（移动端交互与自闭合提示已彻底修复）！")
+    print("✅ `docs/index.html` 纯客户端日历枢纽构建完成（通用全系 AI 接口适配版已就绪）！")
 
 if __name__ == "__main__":
     generate_index_template()
