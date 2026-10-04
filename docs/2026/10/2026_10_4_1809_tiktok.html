@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TikTok Video 7691444086586281237</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        :root { --bg: #f2f2f7; --card: #ffffff; --text: #1c1e21; --muted: #8e8e93; --accent: #fe2c55; --bubble: #e5e5ea; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 0; text-align: left; -webkit-font-smoothing: antialiased; }
+        .container { max-width: 600px; margin: 0 auto; padding: 0 0 50px 0; }
+        .nav-back { padding: 15px; text-align: center; background: var(--card); position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 10px rgba(0,0,0,0.05); display: flex; justify-content: center; align-items: center; }
+        .nav-back a { text-decoration: none; color: white; background: #fe2c55; padding: 8px 20px; border-radius: 20px; font-weight: bold; font-size: 0.9rem; position: relative; z-index: 2;}
+        .sync-status { padding: 4px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: bold; display: none; color: #fff; background: #2ea44f; position: absolute; right: 15px; z-index: 3; }
+        
+        .video-card { background: var(--card); border-bottom-left-radius: 24px; border-bottom-right-radius: 24px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.04); margin-bottom: 25px; }
+        .video-thumb { width: 100%; max-height: 400px; display: block; object-fit: contain; background: #000; }
+        .video-info { padding: 20px; }
+        .v-channel { font-size: 0.85rem; color: var(--accent); font-weight: 700; margin-bottom: 6px; display: block; }
+        .v-title { font-size: 1.15rem; font-weight: 700; margin: 0 0 15px 0; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .v-actions { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #f0f0f0; padding-top: 15px; }
+        .timestamp { font-size: 0.85rem; color: var(--muted); font-weight: 500; }
+        .btn-play { background: #000; color: #fff; text-decoration: none; padding: 8px 16px; border-radius: 20px; font-size: 0.9rem; font-weight: 700; }
+        
+        .chat-container { padding: 0 15px; display: flex; flex-direction: column; gap: 20px; }
+        .chat-message { display: flex; gap: 12px; align-items: flex-start; }
+        .avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; background: #ddd; flex-shrink: 0; }
+        .message-content { flex: 1; min-width: 0; }
+        .message-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 4px; padding-left: 2px; }
+        .author { font-size: 0.85rem; color: var(--muted); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70%; }
+        .likes { font-size: 0.75rem; color: var(--accent); font-weight: 700; background: #ffebee; padding: 2px 8px; border-radius: 10px; }
+        .empty-state { text-align: center; color: var(--muted); padding: 40px 20px; }
+        
+        .para-wrap { width: 100%; display: flex; flex-direction: column; align-items: flex-start; }
+        .bubble { background: var(--card); padding: 12px 16px; border-radius: 2px 18px 18px 18px; font-size: 1.05rem; line-height: 1.5; color: var(--text); box-shadow: 0 2px 8px rgba(0,0,0,0.03); white-space: pre-wrap; word-wrap: break-word; }
+        .anno-toggle, .ai-toggle { display: inline-block; margin-left: 8px; cursor: pointer; opacity: 0.3; font-size: 0.85rem; vertical-align: baseline; padding: 2px 4px; border-radius: 4px; transition: all 0.2s; user-select: none; }
+        .anno-toggle:hover, .ai-toggle:hover { opacity: 0.8; transform: scale(1.1); }
+        .anno-toggle.has-anno { opacity: 1; }
+        .ai-toggle.loading::after { content: "⏳"; display: inline-block; animation: spin 1s linear infinite; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        
+        .anno-box { display: none; margin-top: 8px; width: 100%; box-sizing: border-box; background: #fff; border-left: 3px solid var(--accent); padding: 12px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .anno-view { font-size: 0.95rem; line-height: 1.5; color: #333; }
+        .anno-edit { width: 100%; min-height: 80px; padding: 10px; font-family: monospace; font-size: 0.95rem; border: 1px dashed #ccc; border-radius: 6px; box-sizing: border-box; display: none; resize: vertical; }
+        .anno-edit:focus { outline: none; border: 1px solid var(--accent); }
+
+        .markdown-body p { margin-top: 0; margin-bottom: 8px; }
+        .markdown-body p:last-child { margin-bottom: 0; }
+        .markdown-body h1, .markdown-body h2, .markdown-body h3 { color: var(--accent); font-size: 1.1rem; margin: 10px 0 8px 0; border-bottom: 1px dashed #eee; padding-bottom: 4px; }
+        .markdown-body ul, .markdown-body ol { margin: 0 0 8px 0; padding-left: 20px; }
+        .markdown-body blockquote { margin: 0 0 10px 0; padding: 10px 15px; background: #f9f9f9; border-left: 4px solid var(--accent); color: #666; }
+    </style>
+</head>
+<body>
+    <div class="nav-back">
+        <a href="../../index.html">🔙 返回日曆樞紐</a>
+        <span id="sync-status" class="sync-status"></span>
+    </div>
+    <div class="container">
+        <h2 style="text-align: center; margin-bottom: 25px; color: #333;">📅 2026-10-04</h2>
+        <div class="video-card">
+            <a href="https://www.tiktok.com/video/7691444086586281237" target="_blank"><img src="https://p16-common-sign.tiktokcdn-us.com/tos-alisg-p-0037/oAC6eqclEImvAF0V5HwQ6AGfYnseF8DpRQ7fGq~tplv-tiktokx-origin.image?dr=9636&amp;x-expires=1791280800&amp;x-signature=zJ7WEqyqiP%2BFJnAh4pZ66NZRNJs%3D&amp;t=4d5b0474&amp;ps=13740610&amp;shp=81f88b70&amp;shcp=43f4a2f9&amp;idc=useast5" class="video-thumb" alt="Thumbnail"></a>
+            <div class="video-info">
+                <span class="v-channel">@chihyichia</span>
+                <h1 class="v-title">TikTok Video 7691444086586281237</h1>
+                <div class="v-actions">
+                    <span class="timestamp">更新於: 2026-10-04 18:09</span>
+                    <a href="https://www.tiktok.com/video/7691444086586281237" target="_blank" class="btn-play">▶ 原片</a>
+                </div>
+            </div>
+        </div>
+        <div class="chat-container">
+            
+                <div class="chat-message">
+                    <img src="https://p16-common-sign.tiktokcdn.com/tos-alisg-avt-0068/f57863701fad4a722687ddf81f83dd67~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&amp;refresh_token=424fb194&amp;x-expires=1791194400&amp;x-signature=Ia3j3knXSr06kzypYPt9zAISiJM%3D&amp;t=4d5b0474&amp;ps=13740610&amp;shp=30310797&amp;shcp=ff37627b&amp;idc=my2" class="avatar" alt="avatar" loading="lazy">
+                    <div class="message-content">
+                        <div class="message-header">
+                            <span class="author">Ielts Vu Hoang</span>
+                            <span class="likes">❤️ 4.2k</span>
+                        </div>
+                        <div class="para-wrap">
+                            <div class="bubble card-text">Omg I liked one video 😭<span class="anno-toggle" title="点击添加/查看批注">🔴</span><span class="ai-toggle" title="AI俚语解析">🤖</span></div>
+                            <div class="anno-box" style="display:none;">
+                                <div class="anno-view markdown-body"></div>
+                                <textarea class="anno-edit" style="display:none;" placeholder="在此记录该评论的俚语拆解或灵感..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="chat-message">
+                    <img src="https://p16-common-sign.tiktokcdn.com/tos-alisg-avt-0068/5c22b9ac82afd79236bda48243bb855c~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&amp;refresh_token=40fa1bf6&amp;x-expires=1791194400&amp;x-signature=KJAtpokDkXKzFZeek63E0dGgtr0%3D&amp;t=4d5b0474&amp;ps=13740610&amp;shp=30310797&amp;shcp=ff37627b&amp;idc=my2" class="avatar" alt="avatar" loading="lazy">
+                    <div class="message-content">
+                        <div class="message-header">
+                            <span class="author">Faradiba</span>
+                            <span class="likes">❤️ 972</span>
+                        </div>
+                        <div class="para-wrap">
+                            <div class="bubble card-text">The boss already laughing. Cancel fired😆<span class="anno-toggle" title="点击添加/查看批注">🔴</span><span class="ai-toggle" title="AI俚语解析">🤖</span></div>
+                            <div class="anno-box" style="display:none;">
+                                <div class="anno-view markdown-body"></div>
+                                <textarea class="anno-edit" style="display:none;" placeholder="在此记录该评论的俚语拆解或灵感..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="chat-message">
+                    <img src="https://p16-common-sign.tiktokcdn.com/tos-maliva-avt-0068/183881a13774e77efb021e22ce4de23f~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&amp;refresh_token=d5f8c74f&amp;x-expires=1791194400&amp;x-signature=WHjSLN0sNwAZEWvlAxhUB8R%2Bi58%3D&amp;t=4d5b0474&amp;ps=13740610&amp;shp=30310797&amp;shcp=ff37627b&amp;idc=my2" class="avatar" alt="avatar" loading="lazy">
+                    <div class="message-content">
+                        <div class="message-header">
+                            <span class="author">joschi</span>
+                            <span class="likes">❤️ 136</span>
+                        </div>
+                        <div class="para-wrap">
+                            <div class="bubble card-text">0%: understand,
+100%: in love 😍😍😍<span class="anno-toggle" title="点击添加/查看批注">🔴</span><span class="ai-toggle" title="AI俚语解析">🤖</span></div>
+                            <div class="anno-box" style="display:none;">
+                                <div class="anno-view markdown-body"></div>
+                                <textarea class="anno-edit" style="display:none;" placeholder="在此记录该评论的俚语拆解或灵感..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="chat-message">
+                    <img src="https://p19-common-sign.tiktokcdn.com/tos-maliva-avt-0068/f45550dfb85aa173554d107b84f43ad5~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&amp;refresh_token=8e997ba1&amp;x-expires=1791194400&amp;x-signature=JkXhXp67Malr70a%2FHAPHj7TbNpU%3D&amp;t=4d5b0474&amp;ps=13740610&amp;shp=30310797&amp;shcp=ff37627b&amp;idc=my2" class="avatar" alt="avatar" loading="lazy">
+                    <div class="message-content">
+                        <div class="message-header">
+                            <span class="author">Joseph Blue</span>
+                            <span class="likes">❤️ 115</span>
+                        </div>
+                        <div class="para-wrap">
+                            <div class="bubble card-text">oh... this trend is out of control 😂<span class="anno-toggle" title="点击添加/查看批注">🔴</span><span class="ai-toggle" title="AI俚语解析">🤖</span></div>
+                            <div class="anno-box" style="display:none;">
+                                <div class="anno-view markdown-body"></div>
+                                <textarea class="anno-edit" style="display:none;" placeholder="在此记录该评论的俚语拆解或灵感..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="chat-message">
+                    <img src="https://p16-common-sign.tiktokcdn.com/tos-alisg-avt-0068/7de63b3499f09ffd3ba784ff41acb583~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&amp;refresh_token=806ddc08&amp;x-expires=1791194400&amp;x-signature=JsBbBvykj5C9x5bs45JKTWL0oFk%3D&amp;t=4d5b0474&amp;ps=13740610&amp;shp=30310797&amp;shcp=ff37627b&amp;idc=my2" class="avatar" alt="avatar" loading="lazy">
+                    <div class="message-content">
+                        <div class="message-header">
+                            <span class="author">ByEzartsy</span>
+                            <span class="likes">❤️ 53</span>
+                        </div>
+                        <div class="para-wrap">
+                            <div class="bubble card-text">I liked one video of thing dance and then every video followed😂😂<span class="anno-toggle" title="点击添加/查看批注">🔴</span><span class="ai-toggle" title="AI俚语解析">🤖</span></div>
+                            <div class="anno-box" style="display:none;">
+                                <div class="anno-view markdown-body"></div>
+                                <textarea class="anno-edit" style="display:none;" placeholder="在此记录该评论的俚语拆解或灵感..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="chat-message">
+                    <img src="https://p16-common-sign.tiktokcdn.com/tos-useast2a-avt-0068-euttp/39f225217f5f435d51acd2a927a90db5~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&amp;refresh_token=d5a37324&amp;x-expires=1791194400&amp;x-signature=Icz82Jzxr1OD6HSqN0TNyxt4lYk%3D&amp;t=4d5b0474&amp;ps=13740610&amp;shp=30310797&amp;shcp=ff37627b&amp;idc=my2" class="avatar" alt="avatar" loading="lazy">
+                    <div class="message-content">
+                        <div class="message-header">
+                            <span class="author">Karma_Sutra</span>
+                            <span class="likes">❤️ 53</span>
+                        </div>
+                        <div class="para-wrap">
+                            <div class="bubble card-text">J’ai rien compris aux sous-titres...<span class="anno-toggle" title="点击添加/查看批注">🔴</span><span class="ai-toggle" title="AI俚语解析">🤖</span></div>
+                            <div class="anno-box" style="display:none;">
+                                <div class="anno-view markdown-body"></div>
+                                <textarea class="anno-edit" style="display:none;" placeholder="在此记录该评论的俚语拆解或灵感..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="chat-message">
+                    <img src="https://p16-common-sign.tiktokcdn.com/tos-maliva-avt-0068/d55b850b9684221b68843fae29670180~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&amp;refresh_token=5622c816&amp;x-expires=1791194400&amp;x-signature=e0aJSr4XtvJHxgTOp%2FQ73Nv8hGg%3D&amp;t=4d5b0474&amp;ps=13740610&amp;shp=30310797&amp;shcp=ff37627b&amp;idc=my2" class="avatar" alt="avatar" loading="lazy">
+                    <div class="message-content">
+                        <div class="message-header">
+                            <span class="author">Memps</span>
+                            <span class="likes">❤️ 21</span>
+                        </div>
+                        <div class="para-wrap">
+                            <div class="bubble card-text">I was careful enough not to like that one video, still somehow tiktok knew I laughed 😅<span class="anno-toggle" title="点击添加/查看批注">🔴</span><span class="ai-toggle" title="AI俚语解析">🤖</span></div>
+                            <div class="anno-box" style="display:none;">
+                                <div class="anno-view markdown-body"></div>
+                                <textarea class="anno-edit" style="display:none;" placeholder="在此记录该评论的俚语拆解或灵感..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="chat-message">
+                    <img src="https://p16-common-sign.tiktokcdn.com/tos-useast2a-avt-0068-euttp/8191601ba1adeb65a305b01469989faa~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&amp;refresh_token=859f37c8&amp;x-expires=1791194400&amp;x-signature=wd52aN8ZYT9c4cbWdY4CKAiSPO4%3D&amp;t=4d5b0474&amp;ps=13740610&amp;shp=30310797&amp;shcp=ff37627b&amp;idc=my2" class="avatar" alt="avatar" loading="lazy">
+                    <div class="message-content">
+                        <div class="message-header">
+                            <span class="author">Kharaz Az Lashar</span>
+                            <span class="likes">❤️ 21</span>
+                        </div>
+                        <div class="para-wrap">
+                            <div class="bubble card-text">I didn&#039;t understand a single word, but I laughed anyway 😅<span class="anno-toggle" title="点击添加/查看批注">🔴</span><span class="ai-toggle" title="AI俚语解析">🤖</span></div>
+                            <div class="anno-box" style="display:none;">
+                                <div class="anno-view markdown-body"></div>
+                                <textarea class="anno-edit" style="display:none;" placeholder="在此记录该评论的俚语拆解或灵感..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="chat-message">
+                    <img src="https://p16-common-sign.tiktokcdn.com/tos-useast2a-avt-0068-euttp/64193b4cba25ff63d72d3257af314ca6~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&amp;refresh_token=cfbd1dcb&amp;x-expires=1791194400&amp;x-signature=1pC9pp9IYMf8Nw1pPdyeHao4WKY%3D&amp;t=4d5b0474&amp;ps=13740610&amp;shp=30310797&amp;shcp=ff37627b&amp;idc=my2" class="avatar" alt="avatar" loading="lazy">
+                    <div class="message-content">
+                        <div class="message-header">
+                            <span class="author">Alexa</span>
+                            <span class="likes">❤️ 19</span>
+                        </div>
+                        <div class="para-wrap">
+                            <div class="bubble card-text">😂Oh… the end after the weird dance: the ( dying ) swan! Perfect 👌🏻!!!<span class="anno-toggle" title="点击添加/查看批注">🔴</span><span class="ai-toggle" title="AI俚语解析">🤖</span></div>
+                            <div class="anno-box" style="display:none;">
+                                <div class="anno-view markdown-body"></div>
+                                <textarea class="anno-edit" style="display:none;" placeholder="在此记录该评论的俚语拆解或灵感..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="chat-message">
+                    <img src="https://p16-common-sign.tiktokcdn.com/tos-maliva-avt-0068/324af7f37ca47d5398f9e1d7914afc4c~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&amp;refresh_token=f7c24580&amp;x-expires=1791194400&amp;x-signature=cghGjphy0I80fUCRlJk%2FH8Mbm24%3D&amp;t=4d5b0474&amp;ps=13740610&amp;shp=30310797&amp;shcp=ff37627b&amp;idc=my2" class="avatar" alt="avatar" loading="lazy">
+                    <div class="message-content">
+                        <div class="message-header">
+                            <span class="author">92</span>
+                            <span class="likes">❤️ 7</span>
+                        </div>
+                        <div class="para-wrap">
+                            <div class="bubble card-text">That was just too much, they couldn&#039;t keep it together in the end!☆☆☆<span class="anno-toggle" title="点击添加/查看批注">🔴</span><span class="ai-toggle" title="AI俚语解析">🤖</span></div>
+                            <div class="anno-box" style="display:none;">
+                                <div class="anno-view markdown-body"></div>
+                                <textarea class="anno-edit" style="display:none;" placeholder="在此记录该评论的俚语拆解或灵感..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="chat-message">
+                    <img src="https://p16-common-sign.tiktokcdn.com/tos-alisg-avt-0068/23cd308e587d335376f08dfe9050db24~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&amp;refresh_token=b8a6e57c&amp;x-expires=1791194400&amp;x-signature=rSn6%2BefNbgMmXP%2BZRba2wbXoZBM%3D&amp;t=4d5b0474&amp;ps=13740610&amp;shp=30310797&amp;shcp=ff37627b&amp;idc=my2" class="avatar" alt="avatar" loading="lazy">
+                    <div class="message-content">
+                        <div class="message-header">
+                            <span class="author">Jessie</span>
+                            <span class="likes">❤️ 4</span>
+                        </div>
+                        <div class="para-wrap">
+                            <div class="bubble card-text">She almost laughed at the end 😂<span class="anno-toggle" title="点击添加/查看批注">🔴</span><span class="ai-toggle" title="AI俚语解析">🤖</span></div>
+                            <div class="anno-box" style="display:none;">
+                                <div class="anno-view markdown-body"></div>
+                                <textarea class="anno-edit" style="display:none;" placeholder="在此记录该评论的俚语拆解或灵感..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="chat-message">
+                    <img src="https://p16-common-sign.tiktokcdn.com/tos-alisg-avt-0068/e7b87bf9a73848c4d676a1cd22dd7118~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&amp;refresh_token=cd4d9e63&amp;x-expires=1791194400&amp;x-signature=Ptvl%2FGfA3%2FGroBrzeCZicb13O%2FI%3D&amp;t=4d5b0474&amp;ps=13740610&amp;shp=30310797&amp;shcp=ff37627b&amp;idc=my2" class="avatar" alt="avatar" loading="lazy">
+                    <div class="message-content">
+                        <div class="message-header">
+                            <span class="author">Ritsu Tainaka🥁🍀</span>
+                            <span class="likes">❤️ 3</span>
+                        </div>
+                        <div class="para-wrap">
+                            <div class="bubble card-text">Lung tung quyền<span class="anno-toggle" title="点击添加/查看批注">🔴</span><span class="ai-toggle" title="AI俚语解析">🤖</span></div>
+                            <div class="anno-box" style="display:none;">
+                                <div class="anno-view markdown-body"></div>
+                                <textarea class="anno-edit" style="display:none;" placeholder="在此记录该评论的俚语拆解或灵感..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="chat-message">
+                    <img src="https://p16-common-sign.tiktokcdn.com/tos-alisg-avt-0068/7cf29ff338b3e4320b274d10ffcdf5b3~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&amp;refresh_token=ec19fc88&amp;x-expires=1791194400&amp;x-signature=9OBI26MmGrjzseoP5cu3MONhpQQ%3D&amp;t=4d5b0474&amp;ps=13740610&amp;shp=30310797&amp;shcp=ff37627b&amp;idc=my2" class="avatar" alt="avatar" loading="lazy">
+                    <div class="message-content">
+                        <div class="message-header">
+                            <span class="author">JM</span>
+                            <span class="likes">❤️ 3</span>
+                        </div>
+                        <div class="para-wrap">
+                            <div class="bubble card-text">is this the new 😂 TikTok viral stuff it&#039;s the 7th time today<span class="anno-toggle" title="点击添加/查看批注">🔴</span><span class="ai-toggle" title="AI俚语解析">🤖</span></div>
+                            <div class="anno-box" style="display:none;">
+                                <div class="anno-view markdown-body"></div>
+                                <textarea class="anno-edit" style="display:none;" placeholder="在此记录该评论的俚语拆解或灵感..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="chat-message">
+                    <img src="https://p16-common-sign.tiktokcdn.com/tos-maliva-avt-0068/7320935021920026630~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&amp;refresh_token=f8b23bad&amp;x-expires=1791194400&amp;x-signature=4o4bQUA139AHhK82fc%2B181nAHQY%3D&amp;t=4d5b0474&amp;ps=13740610&amp;shp=30310797&amp;shcp=ff37627b&amp;idc=my2" class="avatar" alt="avatar" loading="lazy">
+                    <div class="message-content">
+                        <div class="message-header">
+                            <span class="author">El Manenn</span>
+                            <span class="likes">❤️ 2</span>
+                        </div>
+                        <div class="para-wrap">
+                            <div class="bubble card-text">i can hear him laughing<span class="anno-toggle" title="点击添加/查看批注">🔴</span><span class="ai-toggle" title="AI俚语解析">🤖</span></div>
+                            <div class="anno-box" style="display:none;">
+                                <div class="anno-view markdown-body"></div>
+                                <textarea class="anno-edit" style="display:none;" placeholder="在此记录该评论的俚语拆解或灵感..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="chat-message">
+                    <img src="https://p16-common-sign.tiktokcdn.com/tos-useast2a-avt-0068-euttp/9ce979622fec45a3bcddbdf5006631bf~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&amp;refresh_token=b8170688&amp;x-expires=1791194400&amp;x-signature=LlvVmpmRfzxpUDkeDz2e1kAbE6M%3D&amp;t=4d5b0474&amp;ps=13740610&amp;shp=30310797&amp;shcp=ff37627b&amp;idc=my2" class="avatar" alt="avatar" loading="lazy">
+                    <div class="message-content">
+                        <div class="message-header">
+                            <span class="author">Mike47</span>
+                            <span class="likes">❤️ 2</span>
+                        </div>
+                        <div class="para-wrap">
+                            <div class="bubble card-text">Shirt Looks nice<span class="anno-toggle" title="点击添加/查看批注">🔴</span><span class="ai-toggle" title="AI俚语解析">🤖</span></div>
+                            <div class="anno-box" style="display:none;">
+                                <div class="anno-view markdown-body"></div>
+                                <textarea class="anno-edit" style="display:none;" placeholder="在此记录该评论的俚语拆解或灵感..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="chat-message">
+                    <img src="https://p16-common-sign.tiktokcdn.com/musically-maliva-obj/1594805258216454~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&amp;refresh_token=8a82669c&amp;x-expires=1791194400&amp;x-signature=Nn4lUoCGxcy%2B%2FocpvW13eQY6GEY%3D&amp;t=4d5b0474&amp;ps=13740610&amp;shp=30310797&amp;shcp=ff37627b&amp;idc=my2" class="avatar" alt="avatar" loading="lazy">
+                    <div class="message-content">
+                        <div class="message-header">
+                            <span class="author">Lakiluk1977</span>
+                            <span class="likes">❤️ 1</span>
+                        </div>
+                        <div class="para-wrap">
+                            <div class="bubble card-text">boss is his father<span class="anno-toggle" title="点击添加/查看批注">🔴</span><span class="ai-toggle" title="AI俚语解析">🤖</span></div>
+                            <div class="anno-box" style="display:none;">
+                                <div class="anno-view markdown-body"></div>
+                                <textarea class="anno-edit" style="display:none;" placeholder="在此记录该评论的俚语拆解或灵感..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="chat-message">
+                    <img src="https://p19-common-sign.tiktokcdn.com/tos-useast2a-avt-0068-euttp/9f4b1e4dbd193ff1da6aa59b4dcad430~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&amp;refresh_token=f15bbe03&amp;x-expires=1791194400&amp;x-signature=hbrPL2lu3ycKrR83Kz0J7gKjolU%3D&amp;t=4d5b0474&amp;ps=13740610&amp;shp=30310797&amp;shcp=ff37627b&amp;idc=my2" class="avatar" alt="avatar" loading="lazy">
+                    <div class="message-content">
+                        <div class="message-header">
+                            <span class="author">Sacred Meme</span>
+                            <span class="likes">❤️ 1</span>
+                        </div>
+                        <div class="para-wrap">
+                            <div class="bubble card-text">hahahahahahahaha thia trend gets better and better<span class="anno-toggle" title="点击添加/查看批注">🔴</span><span class="ai-toggle" title="AI俚语解析">🤖</span></div>
+                            <div class="anno-box" style="display:none;">
+                                <div class="anno-view markdown-body"></div>
+                                <textarea class="anno-edit" style="display:none;" placeholder="在此记录该评论的俚语拆解或灵感..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="chat-message">
+                    <img src="https://p19-common-sign.tiktokcdn.com/tos-alisg-avt-0068/c67f8e87dc5e5b89c68befc4883eb5f7~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&amp;refresh_token=7447c1c1&amp;x-expires=1791194400&amp;x-signature=Qn8W23XwGCF%2F3kGAuGqc5HuNXDc%3D&amp;t=4d5b0474&amp;ps=13740610&amp;shp=30310797&amp;shcp=ff37627b&amp;idc=my2" class="avatar" alt="avatar" loading="lazy">
+                    <div class="message-content">
+                        <div class="message-header">
+                            <span class="author">lehin</span>
+                            <span class="likes">❤️ 1</span>
+                        </div>
+                        <div class="para-wrap">
+                            <div class="bubble card-text">sooooo... now I really need that system..[Tears of joy][Tears of joy][Tears of joy][Tears of joy]<span class="anno-toggle" title="点击添加/查看批注">🔴</span><span class="ai-toggle" title="AI俚语解析">🤖</span></div>
+                            <div class="anno-box" style="display:none;">
+                                <div class="anno-view markdown-body"></div>
+                                <textarea class="anno-edit" style="display:none;" placeholder="在此记录该评论的俚语拆解或灵感..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="chat-message">
+                    <img src="https://p16-common-sign.tiktokcdn.com/tos-maliva-avt-0068/ae72a7dd4b990ac8daedcb9debc3ee2f~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&amp;refresh_token=e43c8b66&amp;x-expires=1791194400&amp;x-signature=dAR4Us4PV4txLdNS2VlW%2Fw1A5BQ%3D&amp;t=4d5b0474&amp;ps=13740610&amp;shp=30310797&amp;shcp=ff37627b&amp;idc=my2" class="avatar" alt="avatar" loading="lazy">
+                    <div class="message-content">
+                        <div class="message-header">
+                            <span class="author">ꈍ◡ꈍ</span>
+                            <span class="likes">❤️ 1</span>
+                        </div>
+                        <div class="para-wrap">
+                            <div class="bubble card-text">flora and Luke on a parallel universe🤣<span class="anno-toggle" title="点击添加/查看批注">🔴</span><span class="ai-toggle" title="AI俚语解析">🤖</span></div>
+                            <div class="anno-box" style="display:none;">
+                                <div class="anno-view markdown-body"></div>
+                                <textarea class="anno-edit" style="display:none;" placeholder="在此记录该评论的俚语拆解或灵感..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="chat-message">
+                    <img src="https://p16-common-sign.tiktokcdn.com/tos-useast2a-avt-0068-euttp/67128b5aaab2c8cb26c29422e995c1b6~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&amp;refresh_token=c79522db&amp;x-expires=1791194400&amp;x-signature=IV3CjcTq4hEi%2BltqBcgI%2FJoo5eU%3D&amp;t=4d5b0474&amp;ps=13740610&amp;shp=30310797&amp;shcp=ff37627b&amp;idc=my2" class="avatar" alt="avatar" loading="lazy">
+                    <div class="message-content">
+                        <div class="message-header">
+                            <span class="author">Naturelover</span>
+                            <span class="likes">❤️ 1</span>
+                        </div>
+                        <div class="para-wrap">
+                            <div class="bubble card-text">Love your top shirt<span class="anno-toggle" title="点击添加/查看批注">🔴</span><span class="ai-toggle" title="AI俚语解析">🤖</span></div>
+                            <div class="anno-box" style="display:none;">
+                                <div class="anno-view markdown-body"></div>
+                                <textarea class="anno-edit" style="display:none;" placeholder="在此记录该评论的俚语拆解或灵感..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="chat-message">
+                    <img src="https://p19-common-sign.tiktokcdn.com/tos-maliva-avt-0068/7f19a1a20b8102586d06ac815f31b296~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&amp;refresh_token=8fc0ed29&amp;x-expires=1791194400&amp;x-signature=%2Fh5hv3if%2FlYWzaWWfHCgEe3LkGk%3D&amp;t=4d5b0474&amp;ps=13740610&amp;shp=30310797&amp;shcp=ff37627b&amp;idc=my2" class="avatar" alt="avatar" loading="lazy">
+                    <div class="message-content">
+                        <div class="message-header">
+                            <span class="author">djdjjejwi2iwiwgvwv2b</span>
+                            <span class="likes">❤️ 1</span>
+                        </div>
+                        <div class="para-wrap">
+                            <div class="bubble card-text">who is this blogger I want to subscribe 😂<span class="anno-toggle" title="点击添加/查看批注">🔴</span><span class="ai-toggle" title="AI俚语解析">🤖</span></div>
+                            <div class="anno-box" style="display:none;">
+                                <div class="anno-view markdown-body"></div>
+                                <textarea class="anno-edit" style="display:none;" placeholder="在此记录该评论的俚语拆解或灵感..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="chat-message">
+                    <img src="https://p16-common-sign.tiktokcdn.com/tos-alisg-avt-0068/a2a2f21c1b6db42aa51dd998e0fae682~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&amp;refresh_token=cedfb7ab&amp;x-expires=1791194400&amp;x-signature=di2cexjy9m%2Bq2Vm8dGP%2FSz5WPSk%3D&amp;t=4d5b0474&amp;ps=13740610&amp;shp=30310797&amp;shcp=ff37627b&amp;idc=my2" class="avatar" alt="avatar" loading="lazy">
+                    <div class="message-content">
+                        <div class="message-header">
+                            <span class="author">bogard</span>
+                            <span class="likes">❤️ 0</span>
+                        </div>
+                        <div class="para-wrap">
+                            <div class="bubble card-text">this man was going viral<span class="anno-toggle" title="点击添加/查看批注">🔴</span><span class="ai-toggle" title="AI俚语解析">🤖</span></div>
+                            <div class="anno-box" style="display:none;">
+                                <div class="anno-view markdown-body"></div>
+                                <textarea class="anno-edit" style="display:none;" placeholder="在此记录该评论的俚语拆解或灵感..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="chat-message">
+                    <img src="https://p16-common-sign.tiktokcdn.com/musically-maliva-obj/1594805258216454~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&amp;refresh_token=8a82669c&amp;x-expires=1791194400&amp;x-signature=Nn4lUoCGxcy%2B%2FocpvW13eQY6GEY%3D&amp;t=4d5b0474&amp;ps=13740610&amp;shp=30310797&amp;shcp=ff37627b&amp;idc=my2" class="avatar" alt="avatar" loading="lazy">
+                    <div class="message-content">
+                        <div class="message-header">
+                            <span class="author">Cnbl21</span>
+                            <span class="likes">❤️ 0</span>
+                        </div>
+                        <div class="para-wrap">
+                            <div class="bubble card-text">I laughed so loudly at 1.30am. Hope I didn’t disturb anyone. It’s hilarious!!<span class="anno-toggle" title="点击添加/查看批注">🔴</span><span class="ai-toggle" title="AI俚语解析">🤖</span></div>
+                            <div class="anno-box" style="display:none;">
+                                <div class="anno-view markdown-body"></div>
+                                <textarea class="anno-edit" style="display:none;" placeholder="在此记录该评论的俚语拆解或灵感..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="chat-message">
+                    <img src="https://p19-common-sign.tiktokcdn.com/tos-alisg-avt-0068/ab4d61f5ba043467588db2be6ae98d9a~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&amp;refresh_token=fa6ed0b9&amp;x-expires=1791194400&amp;x-signature=yw5j3V22lRkTfMk9BojArA%2Bhteo%3D&amp;t=4d5b0474&amp;ps=13740610&amp;shp=30310797&amp;shcp=ff37627b&amp;idc=my2" class="avatar" alt="avatar" loading="lazy">
+                    <div class="message-content">
+                        <div class="message-header">
+                            <span class="author">Gihan Tharakazz</span>
+                            <span class="likes">❤️ 0</span>
+                        </div>
+                        <div class="para-wrap">
+                            <div class="bubble card-text">cat in her dress is soo distraction<span class="anno-toggle" title="点击添加/查看批注">🔴</span><span class="ai-toggle" title="AI俚语解析">🤖</span></div>
+                            <div class="anno-box" style="display:none;">
+                                <div class="anno-view markdown-body"></div>
+                                <textarea class="anno-edit" style="display:none;" placeholder="在此记录该评论的俚语拆解或灵感..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="chat-message">
+                    <img src="https://p16-common-sign.tiktokcdn.com/tos-alisg-avt-0068/a45bbf78e6c1b9b38cf5410f95e56110~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&amp;refresh_token=b707b5ad&amp;x-expires=1791194400&amp;x-signature=yYLWYL9Zk%2FCREaFIAItwxX3RFHk%3D&amp;t=4d5b0474&amp;ps=13740610&amp;shp=30310797&amp;shcp=ff37627b&amp;idc=my2" class="avatar" alt="avatar" loading="lazy">
+                    <div class="message-content">
+                        <div class="message-header">
+                            <span class="author">Mohazil Ajil Mohamed</span>
+                            <span class="likes">❤️ 0</span>
+                        </div>
+                        <div class="para-wrap">
+                            <div class="bubble card-text">after one to another one...make me tired laughing<span class="anno-toggle" title="点击添加/查看批注">🔴</span><span class="ai-toggle" title="AI俚语解析">🤖</span></div>
+                            <div class="anno-box" style="display:none;">
+                                <div class="anno-view markdown-body"></div>
+                                <textarea class="anno-edit" style="display:none;" placeholder="在此记录该评论的俚语拆解或灵感..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="chat-message">
+                    <img src="https://p16-common-sign.tiktokcdn.com/tos-alisg-avt-0068/ce202989168085df891cd9b5ee7e3754~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&amp;refresh_token=24b92ade&amp;x-expires=1791194400&amp;x-signature=FO0qkG0dzJ6566kUbTxabswOpP4%3D&amp;t=4d5b0474&amp;ps=13740610&amp;shp=30310797&amp;shcp=ff37627b&amp;idc=my2" class="avatar" alt="avatar" loading="lazy">
+                    <div class="message-content">
+                        <div class="message-header">
+                            <span class="author">CapikBulus</span>
+                            <span class="likes">❤️ 0</span>
+                        </div>
+                        <div class="para-wrap">
+                            <div class="bubble card-text">The last laugh 😂😂😂<span class="anno-toggle" title="点击添加/查看批注">🔴</span><span class="ai-toggle" title="AI俚语解析">🤖</span></div>
+                            <div class="anno-box" style="display:none;">
+                                <div class="anno-view markdown-body"></div>
+                                <textarea class="anno-edit" style="display:none;" placeholder="在此记录该评论的俚语拆解或灵感..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="chat-message">
+                    <img src="https://p16-common-sign.tiktokcdn.com/tos-maliva-avt-0068/fa25af8b56335a821f7f82ec723136c4~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&amp;refresh_token=8af7f8c0&amp;x-expires=1791194400&amp;x-signature=RqnFYrcpeVkl1Hs7yMUrn5oJwlM%3D&amp;t=4d5b0474&amp;ps=13740610&amp;shp=30310797&amp;shcp=ff37627b&amp;idc=my2" class="avatar" alt="avatar" loading="lazy">
+                    <div class="message-content">
+                        <div class="message-header">
+                            <span class="author">Zoran</span>
+                            <span class="likes">❤️ 0</span>
+                        </div>
+                        <div class="para-wrap">
+                            <div class="bubble card-text">i spit on my phone😭<span class="anno-toggle" title="点击添加/查看批注">🔴</span><span class="ai-toggle" title="AI俚语解析">🤖</span></div>
+                            <div class="anno-box" style="display:none;">
+                                <div class="anno-view markdown-body"></div>
+                                <textarea class="anno-edit" style="display:none;" placeholder="在此记录该评论的俚语拆解或灵感..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+        </div>
+    </div>
+    <script id="page-data" type="application/json">{"year":2026,"month":10,"day":4,"video":{"title":"TikTok Video 7691444086586281237","channel":"@chihyichia","thumb":"https://p16-common-sign.tiktokcdn-us.com/tos-alisg-p-0037/oAC6eqclEImvAF0V5HwQ6AGfYnseF8DpRQ7fGq~tplv-tiktokx-origin.image?dr=9636&x-expires=1791280800&x-signature=zJ7WEqyqiP%2BFJnAh4pZ66NZRNJs%3D&t=4d5b0474&ps=13740610&shp=81f88b70&shcp=43f4a2f9&idc=useast5","url":"https://www.tiktok.com/video/7691444086586281237","now_str":"2026-10-04 18:09"},"comments":[{"author":"Ielts Vu Hoang","avatar":"https://p16-common-sign.tiktokcdn.com/tos-alisg-avt-0068/f57863701fad4a722687ddf81f83dd67~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&refresh_token=424fb194&x-expires=1791194400&x-signature=Ia3j3knXSr06kzypYPt9zAISiJM%3D&t=4d5b0474&ps=13740610&shp=30310797&shcp=ff37627b&idc=my2","likes_str":"4.2k","text":"Omg I liked one video 😭","annotation":""},{"author":"Faradiba","avatar":"https://p16-common-sign.tiktokcdn.com/tos-alisg-avt-0068/5c22b9ac82afd79236bda48243bb855c~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&refresh_token=40fa1bf6&x-expires=1791194400&x-signature=KJAtpokDkXKzFZeek63E0dGgtr0%3D&t=4d5b0474&ps=13740610&shp=30310797&shcp=ff37627b&idc=my2","likes_str":"972","text":"The boss already laughing. Cancel fired😆","annotation":""},{"author":"joschi","avatar":"https://p16-common-sign.tiktokcdn.com/tos-maliva-avt-0068/183881a13774e77efb021e22ce4de23f~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&refresh_token=d5f8c74f&x-expires=1791194400&x-signature=WHjSLN0sNwAZEWvlAxhUB8R%2Bi58%3D&t=4d5b0474&ps=13740610&shp=30310797&shcp=ff37627b&idc=my2","likes_str":"136","text":"0%: understand,\n100%: in love 😍😍😍","annotation":""},{"author":"Joseph Blue","avatar":"https://p19-common-sign.tiktokcdn.com/tos-maliva-avt-0068/f45550dfb85aa173554d107b84f43ad5~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&refresh_token=8e997ba1&x-expires=1791194400&x-signature=JkXhXp67Malr70a%2FHAPHj7TbNpU%3D&t=4d5b0474&ps=13740610&shp=30310797&shcp=ff37627b&idc=my2","likes_str":"115","text":"oh... this trend is out of control 😂","annotation":""},{"author":"ByEzartsy","avatar":"https://p16-common-sign.tiktokcdn.com/tos-alisg-avt-0068/7de63b3499f09ffd3ba784ff41acb583~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&refresh_token=806ddc08&x-expires=1791194400&x-signature=JsBbBvykj5C9x5bs45JKTWL0oFk%3D&t=4d5b0474&ps=13740610&shp=30310797&shcp=ff37627b&idc=my2","likes_str":"53","text":"I liked one video of thing dance and then every video followed😂😂","annotation":""},{"author":"Karma_Sutra","avatar":"https://p16-common-sign.tiktokcdn.com/tos-useast2a-avt-0068-euttp/39f225217f5f435d51acd2a927a90db5~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&refresh_token=d5a37324&x-expires=1791194400&x-signature=Icz82Jzxr1OD6HSqN0TNyxt4lYk%3D&t=4d5b0474&ps=13740610&shp=30310797&shcp=ff37627b&idc=my2","likes_str":"53","text":"J’ai rien compris aux sous-titres...","annotation":""},{"author":"Memps","avatar":"https://p16-common-sign.tiktokcdn.com/tos-maliva-avt-0068/d55b850b9684221b68843fae29670180~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&refresh_token=5622c816&x-expires=1791194400&x-signature=e0aJSr4XtvJHxgTOp%2FQ73Nv8hGg%3D&t=4d5b0474&ps=13740610&shp=30310797&shcp=ff37627b&idc=my2","likes_str":"21","text":"I was careful enough not to like that one video, still somehow tiktok knew I laughed 😅","annotation":""},{"author":"Kharaz Az Lashar","avatar":"https://p16-common-sign.tiktokcdn.com/tos-useast2a-avt-0068-euttp/8191601ba1adeb65a305b01469989faa~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&refresh_token=859f37c8&x-expires=1791194400&x-signature=wd52aN8ZYT9c4cbWdY4CKAiSPO4%3D&t=4d5b0474&ps=13740610&shp=30310797&shcp=ff37627b&idc=my2","likes_str":"21","text":"I didn't understand a single word, but I laughed anyway 😅","annotation":""},{"author":"Alexa","avatar":"https://p16-common-sign.tiktokcdn.com/tos-useast2a-avt-0068-euttp/64193b4cba25ff63d72d3257af314ca6~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&refresh_token=cfbd1dcb&x-expires=1791194400&x-signature=1pC9pp9IYMf8Nw1pPdyeHao4WKY%3D&t=4d5b0474&ps=13740610&shp=30310797&shcp=ff37627b&idc=my2","likes_str":"19","text":"😂Oh… the end after the weird dance: the ( dying ) swan! Perfect 👌🏻!!!","annotation":""},{"author":"92","avatar":"https://p16-common-sign.tiktokcdn.com/tos-maliva-avt-0068/324af7f37ca47d5398f9e1d7914afc4c~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&refresh_token=f7c24580&x-expires=1791194400&x-signature=cghGjphy0I80fUCRlJk%2FH8Mbm24%3D&t=4d5b0474&ps=13740610&shp=30310797&shcp=ff37627b&idc=my2","likes_str":"7","text":"That was just too much, they couldn't keep it together in the end!☆☆☆","annotation":""},{"author":"Jessie","avatar":"https://p16-common-sign.tiktokcdn.com/tos-alisg-avt-0068/23cd308e587d335376f08dfe9050db24~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&refresh_token=b8a6e57c&x-expires=1791194400&x-signature=rSn6%2BefNbgMmXP%2BZRba2wbXoZBM%3D&t=4d5b0474&ps=13740610&shp=30310797&shcp=ff37627b&idc=my2","likes_str":"4","text":"She almost laughed at the end 😂","annotation":""},{"author":"Ritsu Tainaka🥁🍀","avatar":"https://p16-common-sign.tiktokcdn.com/tos-alisg-avt-0068/e7b87bf9a73848c4d676a1cd22dd7118~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&refresh_token=cd4d9e63&x-expires=1791194400&x-signature=Ptvl%2FGfA3%2FGroBrzeCZicb13O%2FI%3D&t=4d5b0474&ps=13740610&shp=30310797&shcp=ff37627b&idc=my2","likes_str":"3","text":"Lung tung quyền","annotation":""},{"author":"JM","avatar":"https://p16-common-sign.tiktokcdn.com/tos-alisg-avt-0068/7cf29ff338b3e4320b274d10ffcdf5b3~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&refresh_token=ec19fc88&x-expires=1791194400&x-signature=9OBI26MmGrjzseoP5cu3MONhpQQ%3D&t=4d5b0474&ps=13740610&shp=30310797&shcp=ff37627b&idc=my2","likes_str":"3","text":"is this the new 😂 TikTok viral stuff it's the 7th time today","annotation":""},{"author":"El Manenn","avatar":"https://p16-common-sign.tiktokcdn.com/tos-maliva-avt-0068/7320935021920026630~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&refresh_token=f8b23bad&x-expires=1791194400&x-signature=4o4bQUA139AHhK82fc%2B181nAHQY%3D&t=4d5b0474&ps=13740610&shp=30310797&shcp=ff37627b&idc=my2","likes_str":"2","text":"i can hear him laughing","annotation":""},{"author":"Mike47","avatar":"https://p16-common-sign.tiktokcdn.com/tos-useast2a-avt-0068-euttp/9ce979622fec45a3bcddbdf5006631bf~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&refresh_token=b8170688&x-expires=1791194400&x-signature=LlvVmpmRfzxpUDkeDz2e1kAbE6M%3D&t=4d5b0474&ps=13740610&shp=30310797&shcp=ff37627b&idc=my2","likes_str":"2","text":"Shirt Looks nice","annotation":""},{"author":"Lakiluk1977","avatar":"https://p16-common-sign.tiktokcdn.com/musically-maliva-obj/1594805258216454~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&refresh_token=8a82669c&x-expires=1791194400&x-signature=Nn4lUoCGxcy%2B%2FocpvW13eQY6GEY%3D&t=4d5b0474&ps=13740610&shp=30310797&shcp=ff37627b&idc=my2","likes_str":"1","text":"boss is his father","annotation":""},{"author":"Sacred Meme","avatar":"https://p19-common-sign.tiktokcdn.com/tos-useast2a-avt-0068-euttp/9f4b1e4dbd193ff1da6aa59b4dcad430~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&refresh_token=f15bbe03&x-expires=1791194400&x-signature=hbrPL2lu3ycKrR83Kz0J7gKjolU%3D&t=4d5b0474&ps=13740610&shp=30310797&shcp=ff37627b&idc=my2","likes_str":"1","text":"hahahahahahahaha thia trend gets better and better","annotation":""},{"author":"lehin","avatar":"https://p19-common-sign.tiktokcdn.com/tos-alisg-avt-0068/c67f8e87dc5e5b89c68befc4883eb5f7~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&refresh_token=7447c1c1&x-expires=1791194400&x-signature=Qn8W23XwGCF%2F3kGAuGqc5HuNXDc%3D&t=4d5b0474&ps=13740610&shp=30310797&shcp=ff37627b&idc=my2","likes_str":"1","text":"sooooo... now I really need that system..[Tears of joy][Tears of joy][Tears of joy][Tears of joy]","annotation":""},{"author":"ꈍ◡ꈍ","avatar":"https://p16-common-sign.tiktokcdn.com/tos-maliva-avt-0068/ae72a7dd4b990ac8daedcb9debc3ee2f~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&refresh_token=e43c8b66&x-expires=1791194400&x-signature=dAR4Us4PV4txLdNS2VlW%2Fw1A5BQ%3D&t=4d5b0474&ps=13740610&shp=30310797&shcp=ff37627b&idc=my2","likes_str":"1","text":"flora and Luke on a parallel universe🤣","annotation":""},{"author":"Naturelover","avatar":"https://p16-common-sign.tiktokcdn.com/tos-useast2a-avt-0068-euttp/67128b5aaab2c8cb26c29422e995c1b6~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&refresh_token=c79522db&x-expires=1791194400&x-signature=IV3CjcTq4hEi%2BltqBcgI%2FJoo5eU%3D&t=4d5b0474&ps=13740610&shp=30310797&shcp=ff37627b&idc=my2","likes_str":"1","text":"Love your top shirt","annotation":""},{"author":"djdjjejwi2iwiwgvwv2b","avatar":"https://p19-common-sign.tiktokcdn.com/tos-maliva-avt-0068/7f19a1a20b8102586d06ac815f31b296~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&refresh_token=8fc0ed29&x-expires=1791194400&x-signature=%2Fh5hv3if%2FlYWzaWWfHCgEe3LkGk%3D&t=4d5b0474&ps=13740610&shp=30310797&shcp=ff37627b&idc=my2","likes_str":"1","text":"who is this blogger I want to subscribe 😂","annotation":""},{"author":"bogard","avatar":"https://p16-common-sign.tiktokcdn.com/tos-alisg-avt-0068/a2a2f21c1b6db42aa51dd998e0fae682~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&refresh_token=cedfb7ab&x-expires=1791194400&x-signature=di2cexjy9m%2Bq2Vm8dGP%2FSz5WPSk%3D&t=4d5b0474&ps=13740610&shp=30310797&shcp=ff37627b&idc=my2","likes_str":"0","text":"this man was going viral","annotation":""},{"author":"Cnbl21","avatar":"https://p16-common-sign.tiktokcdn.com/musically-maliva-obj/1594805258216454~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&refresh_token=8a82669c&x-expires=1791194400&x-signature=Nn4lUoCGxcy%2B%2FocpvW13eQY6GEY%3D&t=4d5b0474&ps=13740610&shp=30310797&shcp=ff37627b&idc=my2","likes_str":"0","text":"I laughed so loudly at 1.30am. Hope I didn’t disturb anyone. It’s hilarious!!","annotation":""},{"author":"Gihan Tharakazz","avatar":"https://p19-common-sign.tiktokcdn.com/tos-alisg-avt-0068/ab4d61f5ba043467588db2be6ae98d9a~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&refresh_token=fa6ed0b9&x-expires=1791194400&x-signature=yw5j3V22lRkTfMk9BojArA%2Bhteo%3D&t=4d5b0474&ps=13740610&shp=30310797&shcp=ff37627b&idc=my2","likes_str":"0","text":"cat in her dress is soo distraction","annotation":""},{"author":"Mohazil Ajil Mohamed","avatar":"https://p16-common-sign.tiktokcdn.com/tos-alisg-avt-0068/a45bbf78e6c1b9b38cf5410f95e56110~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&refresh_token=b707b5ad&x-expires=1791194400&x-signature=yYLWYL9Zk%2FCREaFIAItwxX3RFHk%3D&t=4d5b0474&ps=13740610&shp=30310797&shcp=ff37627b&idc=my2","likes_str":"0","text":"after one to another one...make me tired laughing","annotation":""},{"author":"CapikBulus","avatar":"https://p16-common-sign.tiktokcdn.com/tos-alisg-avt-0068/ce202989168085df891cd9b5ee7e3754~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&refresh_token=24b92ade&x-expires=1791194400&x-signature=FO0qkG0dzJ6566kUbTxabswOpP4%3D&t=4d5b0474&ps=13740610&shp=30310797&shcp=ff37627b&idc=my2","likes_str":"0","text":"The last laugh 😂😂😂","annotation":""},{"author":"Zoran","avatar":"https://p16-common-sign.tiktokcdn.com/tos-maliva-avt-0068/fa25af8b56335a821f7f82ec723136c4~tplv-tiktokx-cropcenter:100:100.jpg?dr=14579&refresh_token=8af7f8c0&x-expires=1791194400&x-signature=RqnFYrcpeVkl1Hs7yMUrn5oJwlM%3D&t=4d5b0474&ps=13740610&shp=30310797&shcp=ff37627b&idc=my2","likes_str":"0","text":"i spit on my phone😭","annotation":""}]}</script>
+    <script id="matrix-engine">
+function renderMarkdown(text) {
+    if (typeof marked === 'undefined') return text;
+    let safeText = text.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+                       .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
+                       .replace(/\bon[a-z]+\s*=/gi, 'data-blocked=');
+    return marked.parse(safeText);
+}
+
+let syncTimeout = null;
+function scheduleSync() {
+    const statusMsg = document.getElementById('sync-status');
+    statusMsg.style.display = 'inline-block';
+    statusMsg.style.backgroundColor = '#f39c12';
+    statusMsg.innerText = '⏳ 更改已记录，5秒后自动同步...';
+    if (syncTimeout) clearTimeout(syncTimeout);
+    syncTimeout = setTimeout(syncToGitHub, 5000);
+}
+
+const AI_PROMPT = `你是一位精通美国年轻一代流行语、TikTok 梗文化（Gen-Z Slang）的英语名师。
+请分析以下 TikTok 英文评论，严格按照以下 Markdown 格式输出（不要输出任何多余废话）：
+
+### 📌 地道中文翻译
+
+[此处填写结合语境的地道口语化翻译]
+
+### 📌 俚语与核心表达 (Slang & Expressions)
+
+- **[单词/俚语/网络缩写]**
+  = [中文释义]
+  （[详细解析：包括缩写还原(如 fr=for real)、梗背景或地道使用场景]）
+
+评论内容：
+`;
+
+async function fetchCustom(text, url, apiKey, modelName) {
+    const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            model: modelName,
+            messages: [
+                { role: 'system', content: 'You are an expert English teacher specialized in Gen-Z slang and internet culture.' },
+                { role: 'user', content: AI_PROMPT + `"${text}"` }
+            ],
+            temperature: 0.3
+        })
+    });
+    if (!res.ok) throw new Error(`自定义API Error: ${res.status}`);
+    const json = await res.json();
+    if (json.choices && json.choices.length > 0) return json.choices[0].message.content.trim();
+    throw new Error('自定义API返回数据异常');
+}
+
+async function fetchGroq(text, apiKey, modelName) {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            model: modelName,
+            messages: [
+                { role: 'system', content: 'You are an expert English teacher specialized in Gen-Z slang and internet culture.' },
+                { role: 'user', content: AI_PROMPT + `"${text}"` }
+            ],
+            temperature: 0.3
+        })
+    });
+    if (!res.ok) throw new Error(`Groq API Error: ${res.status}`);
+    const json = await res.json();
+    if (json.choices && json.choices.length > 0) return json.choices[0].message.content.trim();
+    throw new Error('Groq返回数据异常');
+}
+
+async function fetchGLM(text, apiKey, modelName) {
+    const res = await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            model: modelName,
+            messages: [
+                { role: 'system', content: 'You are an expert English teacher specialized in Gen-Z slang and internet culture.' },
+                { role: 'user', content: AI_PROMPT + `"${text}"` }
+            ],
+            temperature: 0.3
+        })
+    });
+    if (!res.ok) throw new Error(`智谱GLM API Error: ${res.status}`);
+    const json = await res.json();
+    if (json.choices && json.choices.length > 0) return json.choices[0].message.content.trim();
+    throw new Error('智谱GLM返回数据异常');
+}
+
+async function executeAIPipeline(text) {
+    const pref = localStorage.getItem('PREFERRED_AI') || 'groq';
+    const groqKey = localStorage.getItem('GROQ_API_KEY') || '';
+    const glmKey = localStorage.getItem('GLM_API_KEY') || '';
+    const groqModel = localStorage.getItem('GROQ_MODEL') || 'llama-3.3-70b-versatile';
+    const glmModel = localStorage.getItem('GLM_MODEL') || 'GLM-4.5-Flash';
+    
+    const customUrl = localStorage.getItem('CUSTOM_API_URL') || '';
+    const customKey = localStorage.getItem('CUSTOM_API_KEY') || '';
+    const customModel = localStorage.getItem('CUSTOM_MODEL') || '';
+
+    if ((!groqKey && !glmKey && !customKey) || (!groqModel && !glmModel && !customModel)) throw new Error('MISSING_KEYS_OR_MODELS');
+
+    const runGroq = async () => { if (!groqKey || !groqModel) throw new Error("Groq 配置缺失"); return await fetchGroq(text, groqKey, groqModel); };
+    const runGLM = async () => { if (!glmKey || !glmModel) throw new Error("智谱GLM 配置缺失"); return await fetchGLM(text, glmKey, glmModel); };
+    const runCustom = async () => { if (!customUrl || !customKey || !customModel) throw new Error("自定义配置缺失"); return await fetchCustom(text, customUrl, customKey, customModel); };
+
+    if (pref === 'custom') {
+        try { return await runCustom(); } catch (err) {
+            console.warn("自定义 AI 失败，尝试降级到 Groq:", err);
+            if (groqKey && groqModel) { 
+                document.getElementById('sync-status').innerText = '⚠️ 降级为Groq...'; 
+                try { return await runGroq(); } catch (err2) {
+                    console.warn("Groq 也失败，降级到智谱:", err2);
+                    if (glmKey && glmModel) { document.getElementById('sync-status').innerText = '⚠️ 降级为智谱...'; return await runGLM(); }
+                    throw err2;
+                }
+            } else if (glmKey && glmModel) { 
+                document.getElementById('sync-status').innerText = '⚠️ 降级为智谱...'; return await runGLM(); 
+            }
+            throw err;
+        }
+    } else if (pref === 'groq') {
+        try { return await runGroq(); } catch (err) {
+            console.warn("Groq 失败，降级到智谱:", err);
+            if (glmKey && glmModel) { document.getElementById('sync-status').innerText = '⚠️ 降级为智谱...'; return await runGLM(); }
+            throw err;
+        }
+    } else {
+        try { return await runGLM(); } catch (err) {
+            console.warn("智谱 失败，降级到Groq:", err);
+            if (groqKey && groqModel) { document.getElementById('sync-status').innerText = '⚠️ 降级为Groq...'; return await runGroq(); }
+            throw err;
+        }
+    }
+}
+
+function initAnnotations() {
+    document.querySelectorAll('.para-wrap').forEach(wrap => {
+        const view = wrap.querySelector('.anno-view');
+        const edit = wrap.querySelector('.anno-edit');
+        const toggle = wrap.querySelector('.anno-toggle');
+        const aiToggle = wrap.querySelector('.ai-toggle');
+        const box = wrap.querySelector('.anno-box');
+
+        const rawText = edit.value.trim();
+        if (rawText) { toggle.classList.add('has-anno'); view.innerHTML = renderMarkdown(rawText); }
+        
+        if (aiToggle) {
+            aiToggle.addEventListener('click', async (e) => {
+                e.preventDefault(); e.stopPropagation();
+                if (aiToggle.classList.contains('loading')) return;
+
+                // 【防误触/防浪费确认】：已有内容时必须确认才覆盖
+                if (edit.value.trim().length > 0) {
+                    const confirmOverwrite = confirm('⚠️ 当前已有批注内容，是否重新生成并覆盖？');
+                    if (!confirmOverwrite) return;
+                }
+
+                const groqKey = localStorage.getItem('GROQ_API_KEY') || '';
+                const glmKey = localStorage.getItem('GLM_API_KEY') || '';
+                const customKey = localStorage.getItem('CUSTOM_API_KEY') || '';
+                if (!groqKey && !glmKey && !customKey) { alert('⚠️ 请先返回日历配置中心设置 AI API Key！'); return; }
+
+                const pClone = wrap.querySelector('.card-text').cloneNode(true);
+                pClone.querySelectorAll('.anno-toggle, .ai-toggle').forEach(el => el.remove());
+                const pText = pClone.textContent.trim();
+                if (!pText) return;
+
+                aiToggle.classList.add('loading');
+                const statusMsg = document.getElementById('sync-status');
+                statusMsg.style.display = 'inline-block';
+                statusMsg.style.backgroundColor = '#fe2c55';
+                statusMsg.innerText = '🤖 AI 拆解俚语中...';
+
+                try {
+                    const aiContent = await executeAIPipeline(pText);
+                    box.style.display = 'block'; view.style.display = 'none'; edit.style.display = 'block';
+                    edit.value = aiContent; edit.focus(); edit.blur();
+                    statusMsg.style.backgroundColor = '#2ea44f'; statusMsg.innerText = '✅ 解析成功';
+                    setTimeout(() => { if (statusMsg.innerText.includes('成功')) statusMsg.style.display = 'none'; }, 2000);
+                } catch (err) {
+                    console.error(err);
+                    alert(err.message === 'MISSING_KEYS_OR_MODELS' ? '⚠️ 请返回配置AI密钥和模型！' : '❌ AI 解析失败: ' + err.message);
+                    statusMsg.style.display = 'none';
+                } finally { aiToggle.classList.remove('loading'); }
+            });
+        }
+
+        toggle.addEventListener('click', (e) => {
+            e.preventDefault(); e.stopPropagation();
+            if (box.style.display === 'block') { box.style.display = 'none'; } 
+            else {
+                box.style.display = 'block';
+                if (!edit.value.trim()) { view.style.display = 'none'; edit.style.display = 'block'; setTimeout(() => edit.focus(), 50); } 
+                else { view.style.display = 'block'; edit.style.display = 'none'; }
+            }
+        });
+
+        const triggerEdit = () => { view.style.display = 'none'; edit.style.display = 'block'; edit.value = edit.value; setTimeout(() => edit.focus(), 50); };
+        view.addEventListener('dblclick', () => { box.style.display = 'none'; });
+
+        let lastTap = 0;
+        view.addEventListener('touchstart', e => {
+            if (e.touches.length === 2) { triggerEdit(); } 
+            else if (e.touches.length === 1) {
+                const currentTime = new Date().getTime();
+                const tapLength = currentTime - lastTap;
+                if (tapLength < 500 && tapLength > 0) { box.style.display = 'none'; }
+                lastTap = currentTime;
+            }
+        }, {passive: true});
+
+        edit.addEventListener('blur', () => {
+            const newVal = edit.value.trim();
+            try { view.innerHTML = newVal ? renderMarkdown(newVal) : ''; } catch(e){}
+            edit.style.display = 'none';
+            if (newVal) { view.style.display = 'block'; toggle.classList.add('has-anno'); } 
+            else { view.style.display = 'none'; box.style.display = 'none'; toggle.classList.remove('has-anno'); }
+
+            if (edit.getAttribute('data-old-val') !== newVal) {
+                edit.setAttribute('data-old-val', newVal);
+                scheduleSync();
+            }
+        });
+        edit.setAttribute('data-old-val', rawText);
+    });
+}
+window.onload = initAnnotations;
+
+function escapeHTML(str) {
+    if (typeof str !== 'string') return '';
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+
+function reconstructSelfHTML() {
+    const dataTag = document.getElementById('page-data');
+    if (!dataTag) throw new Error("Missing state data!");
+    const pageData = JSON.parse(dataTag.textContent);
+    
+    document.querySelectorAll('.chat-message').forEach((msg, idx) => {
+        const edit = msg.querySelector('.anno-edit');
+        if (pageData.comments[idx] && edit) {
+            pageData.comments[idx].annotation = edit.value || "";
+        }
+    });
+
+    const newJsonStr = JSON.stringify(pageData).replace(/</g, '\\u003c');
+    const engineText = document.getElementById('matrix-engine').textContent;
+    const styleText = document.querySelector('style').textContent;
+    const titleText = document.title;
+
+    let comments_html = "";
+    pageData.comments.forEach(c => {
+        comments_html += `
+        <div class="chat-message">
+            <img src="${escapeHTML(c.avatar)}" class="avatar" alt="avatar" loading="lazy">
+            <div class="message-content">
+                <div class="message-header">
+                    <span class="author">${escapeHTML(c.author)}</span>
+                    <span class="likes">❤️ ${escapeHTML(c.likes_str)}</span>
+                </div>
+                <div class="para-wrap">
+                    <div class="bubble card-text">${escapeHTML(c.text)}<span class="anno-toggle" title="点击添加/查看批注">🔴</span><span class="ai-toggle" title="AI俚语解析">🤖</span></div>
+                    <div class="anno-box" style="display:none;">
+                        <div class="anno-view markdown-body"></div>
+                        <textarea class="anno-edit" style="display:none;" placeholder="在此记录该评论的俚语拆解或灵感...">${escapeHTML(c.annotation)}</textarea>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+    });
+
+    const cleanHTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>${escapeHTML(titleText)}</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"><\/script>
+    <style>${styleText}</style>
+</head>
+<body>
+    <div class="nav-back">
+        <a href="../../index.html">🔙 返回日曆樞紐</a>
+        <span id="sync-status" class="sync-status"></span>
+    </div>
+    <div class="container">
+        <h2 style="text-align: center; margin-bottom: 25px; color: #333;">📅 ${pageData.year}-${String(pageData.month).padStart(2,'0')}-${String(pageData.day).padStart(2,'0')}</h2>
+        <div class="video-card">
+            <a href="${escapeHTML(pageData.video.url)}" target="_blank"><img src="${escapeHTML(pageData.video.thumb)}" class="video-thumb" alt="Thumbnail"></a>
+            <div class="video-info">
+                <span class="v-channel">${escapeHTML(pageData.video.channel)}</span>
+                <h1 class="v-title">${escapeHTML(pageData.video.title)}</h1>
+                <div class="v-actions">
+                    <span class="timestamp">更新於: ${escapeHTML(pageData.video.now_str)}</span>
+                    <a href="${escapeHTML(pageData.video.url)}" target="_blank" class="btn-play">▶ 原片</a>
+                </div>
+            </div>
+        </div>
+        <div class="chat-container">
+            ${comments_html ? comments_html : '<div class="empty-state">暫無高價值評論。</div>'}
+        </div>
+    </div>
+    <script id="page-data" type="application/json">${newJsonStr}<\/script>
+    <script id="matrix-engine">${engineText}<\/script>
+</body>
+</html>`;
+    return cleanHTML;
+}
+
+async function syncToGitHub() {
+    const token = localStorage.getItem('GH_TOKEN');
+    const owner = localStorage.getItem('GH_OWNER');
+    const repo = 'Tiktok-File';
+    
+    if(!token || !owner) { alert('缺少 GitHub Token，无法同步！'); return; }
+
+    const statusMsg = document.getElementById('sync-status');
+    statusMsg.style.display = 'inline-block';
+    statusMsg.style.backgroundColor = '#2ea44f';
+    statusMsg.innerText = '📡 同步中...';
+
+    const pureHtml = reconstructSelfHTML();
+    let urlPath = window.location.pathname;
+    const match = urlPath.match(/(\d{4}\/\d{1,2}\/[^/]+\.html)$/);
+    let fileRelPath = match ? "docs/" + match[1] : (urlPath.includes('docs/') ? urlPath.substring(urlPath.indexOf('docs/')) : null);
+    
+    if (!fileRelPath) { alert('路径解析失败！'); statusMsg.style.display = 'none'; return; }
+
+    try {
+        const base64Html = btoa(encodeURIComponent(pureHtml).replace(/%([0-9A-F]{2})/g, function(match, p1) { return String.fromCharCode('0x' + p1); }));
+        const getRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${fileRelPath}?t=${Date.now()}`, { headers: { 'Authorization': `token ${token}` }, cache: 'no-store' });
+        if (!getRes.ok) throw new Error('API 获取 SHA 失败');
+        const fileData = await getRes.json();
+        const putRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${fileRelPath}`, {
+            method: 'PUT',
+            headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: `Auto-save annotation`, content: base64Html, sha: fileData.sha })
+        });
+        if(putRes.ok) {
+            statusMsg.style.backgroundColor = '#2ea44f'; statusMsg.innerText = '✅ 云端已同步';
+            setTimeout(() => { if (statusMsg.innerText === '✅ 云端已同步') statusMsg.style.display = 'none'; }, 3000);
+        } else throw new Error('Put 请求失败');
+    } catch(e) {
+        statusMsg.style.backgroundColor = '#e74c3c'; statusMsg.innerText = '❌ 同步失败(点击重试)';
+        statusMsg.style.cursor = 'pointer';
+        statusMsg.onclick = () => { statusMsg.onclick = null; statusMsg.style.cursor = 'default'; syncToGitHub(); };
+    }
+}
+</script>
+</body>
+</html>
